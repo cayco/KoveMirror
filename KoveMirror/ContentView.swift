@@ -41,6 +41,8 @@ struct ContentView: View {
 
 struct MainDashboardView: View {
     @ObservedObject var mirrorService: KoveMirrorService
+    @State private var isStealthModeActive = false
+    @State private var previousBrightness: CGFloat = 0.5
     
     var body: some View {
         NavigationView {
@@ -99,6 +101,43 @@ struct MainDashboardView: View {
                         .background(Color(red: 0.12, green: 0.14, blue: 0.18))
                         .cornerRadius(24)
                         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        
+                        // Pocket Stealth Mode Control Card
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "moon.stars.fill")
+                                            .foregroundColor(.cyan)
+                                        Text("POCKET STEALTH MODE")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.cyan)
+                                    }
+                                    Text("OLED pitch black, 0% display power, 2s lock")
+                                        .font(.caption2)
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                                Toggle("", isOn: $isStealthModeActive)
+                                    .labelsHidden()
+                                    .toggleStyle(SwitchToggleStyle(tint: .cyan))
+                                    .onChange(of: isStealthModeActive) { active in
+                                        #if canImport(UIKit)
+                                        if active {
+                                            previousBrightness = UIScreen.main.brightness
+                                            UIScreen.main.brightness = 0.0
+                                        } else {
+                                            UIScreen.main.brightness = max(0.5, previousBrightness)
+                                        }
+                                        #endif
+                                    }
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(red: 0.12, green: 0.14, blue: 0.18))
+                        .cornerRadius(18)
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
                         
                         // Status Matrix Grid
                         VStack(alignment: .leading, spacing: 12) {
