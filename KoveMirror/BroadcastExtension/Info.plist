@@ -25,10 +25,10 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<key>NSExtensionPointName</key>
-			<string>com.apple.replaykit-broadcast-upload-extension</string>
+			<string>com.apple.replaykit-broadcast-upload</string>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
-		<key>com.apple.replaykit-broadcast-upload-extension</key>
+		<string>com.apple.replaykit-broadcast-upload</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).SampleHandler</string>
 		<key>RPBroadcastProcessMode</key>
