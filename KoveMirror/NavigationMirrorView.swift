@@ -1,4 +1,5 @@
 import SwiftUI
+import ReplayKit
 
 struct NavigationMirrorView: View {
     @ObservedObject var mirrorService: KoveMirrorService
@@ -62,7 +63,7 @@ struct NavigationMirrorView: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                 
-                                Text(mirrorService.screenCapture.isBroadcastIPCActive ? "Active: Mirroring full iPhone screen to TFT!" : "Ready: Launch from iOS Control Center")
+                                Text(mirrorService.screenCapture.isBroadcastIPCActive ? "Active: Mirroring full iPhone screen to TFT!" : "Ready: Tap button below to start broadcast")
                                     .font(.caption2)
                                     .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .green : .gray)
                             }
@@ -71,34 +72,45 @@ struct NavigationMirrorView: View {
                         
                         Divider().background(Color.white.opacity(0.1))
                         
+                        // Direct Apple Broadcast Launcher Button
+                        HStack {
+                            Text("START SCREEN BROADCAST")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.black)
+                            
+                            Spacer()
+                            
+                            SystemBroadcastPickerRepresentable()
+                                .frame(width: 44, height: 44)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.cyan)
+                        .cornerRadius(14)
+                        
                         VStack(alignment: .leading, spacing: 8) {
                             Text("HOW TO MIRROR GOOGLE MAPS / WAZE TO TFT:")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.cyan)
+                                .padding(.top, 4)
                             
                             HStack(alignment: .top, spacing: 8) {
                                 Text("1.")
                                     .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Swipe down from top right corner of iPhone to open Control Center.")
+                                Text("Tap 'START SCREEN BROADCAST' above or long-press Screen Recording (🔴) in Control Center.")
                                     .font(.caption2).foregroundColor(.gray)
                             }
                             
                             HStack(alignment: .top, spacing: 8) {
                                 Text("2.")
                                     .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Long-press the Screen Recording button (🔴).")
-                                    .font(.caption2).foregroundColor(.gray)
-                            }
-                            
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("3.")
-                                    .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
                                 Text("Select 'KoveMirror Broadcast' and tap 'Start Broadcast'.")
                                     .font(.caption2).foregroundColor(.white)
                             }
                             
                             HStack(alignment: .top, spacing: 8) {
-                                Text("4.")
+                                Text("3.")
                                     .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
                                 Text("Open Google Maps, Waze, Scenic, or OsmAnd — your map will project directly onto the motorcycle TFT dash!")
                                     .font(.caption2).foregroundColor(.green)
@@ -122,7 +134,7 @@ struct NavigationMirrorView: View {
                             
                             Spacer()
                             
-                            Text("H.264 Baseline 3.1 @ 30 FPS")
+                            Text("H.264 Baseline Auto @ 30 FPS")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.green)
                             
@@ -241,6 +253,17 @@ struct NavigationMirrorView: View {
             if nextTurnDistance <= 50 { nextTurnDistance = 500 }
         }
     }
+}
+
+struct SystemBroadcastPickerRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
+        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
+        picker.preferredExtension = "com.kove.mirror.ios.broadcast"
+        picker.showsMicrophoneButton = false
+        return picker
+    }
+    
+    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
 }
 
 struct VStatView: View {
