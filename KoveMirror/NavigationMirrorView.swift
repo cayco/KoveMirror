@@ -6,6 +6,7 @@ struct NavigationMirrorView: View {
     @State private var currentSpeed: Int = 78
     @State private var heading: String = "NE"
     @State private var nextTurnDistance: Int = 450
+    @State private var showingPermissionAlert = false
     
     let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
     
@@ -63,7 +64,7 @@ struct NavigationMirrorView: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                 
-                                Text(mirrorService.screenCapture.isBroadcastIPCActive ? "Active: Mirroring full iPhone screen to TFT!" : "Ready: Tap button below to start broadcast")
+                                Text(mirrorService.screenCapture.isBroadcastIPCActive ? "Active: Mirroring full iPhone screen to TFT!" : "Ready: Tap button below to prompt permissions")
                                     .font(.caption2)
                                     .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .green : .gray)
                             }
@@ -72,22 +73,37 @@ struct NavigationMirrorView: View {
                         
                         Divider().background(Color.white.opacity(0.1))
                         
-                        // Direct Apple Broadcast Launcher Button
+                        // Direct Permission & Extension Launcher Button
+                        Button(action: {
+                            triggerBroadcastPermissionPrompt()
+                        }) {
+                            HStack {
+                                Image(systemName: "record.circle")
+                                    .font(.title3)
+                                Text("REQUEST PERMISSION & LAUNCH BROADCAST")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color.cyan)
+                            .cornerRadius(14)
+                        }
+                        
+                        // Built-in System Broadcast Picker View
                         HStack {
-                            Text("START SCREEN BROADCAST")
-                                .font(.subheadline)
+                            Text("QUICK SYSTEM BROADCAST PICKER:")
+                                .font(.caption2)
                                 .fontWeight(.bold)
-                                .foregroundColor(.black)
-                            
+                                .foregroundColor(.gray)
                             Spacer()
-                            
                             SystemBroadcastPickerRepresentable()
                                 .frame(width: 44, height: 44)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.cyan)
-                        .cornerRadius(14)
+                        .padding(.top, 4)
                         
                         VStack(alignment: .leading, spacing: 8) {
                             Text("HOW TO MIRROR GOOGLE MAPS / WAZE TO TFT:")
@@ -98,7 +114,7 @@ struct NavigationMirrorView: View {
                             HStack(alignment: .top, spacing: 8) {
                                 Text("1.")
                                     .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Tap 'START SCREEN BROADCAST' above or long-press Screen Recording (🔴) in Control Center.")
+                                Text("Tap 'REQUEST PERMISSION & LAUNCH BROADCAST' above to grant iOS screen recording permission.")
                                     .font(.caption2).foregroundColor(.gray)
                             }
                             
@@ -251,6 +267,24 @@ struct NavigationMirrorView: View {
             currentSpeed = Int(70 + 12 * sin(Date().timeIntervalSince1970 * 0.4))
             nextTurnDistance = max(50, nextTurnDistance - 5)
             if nextTurnDistance <= 50 { nextTurnDistance = 500 }
+        }
+    }
+    
+    private func triggerBroadcastPermissionPrompt() {
+        RPBroadcastActivityViewController.load(withPreferredExtension: nil) { activityViewController, error in
+            if let error = error {
+                Logger.shared.error("Broadcast permission prompt error: \(error.localizedDescription)")
+                return
+            }
+            
+            if let activityVC = activityViewController {
+                DispatchQueue.main.async {
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController {
+                        rootVC.present(activityVC, animated: true)
+                    }
+                }
+            }
         }
     }
 }
