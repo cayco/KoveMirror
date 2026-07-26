@@ -2,6 +2,7 @@ import Foundation
 import VideoToolbox
 import CoreMedia
 import CoreVideo
+import QuartzCore
 
 public final class H264Encoder: ObservableObject {
     @Published public private(set) var isEncoding = false
@@ -17,6 +18,10 @@ public final class H264Encoder: ObservableObject {
     private var fpsCounter = 0
     private var lastFPSCheck = Date()
     public var onEncodedData: ((Data) -> Void)?
+    
+    private var lastPixelBuffer: CVPixelBuffer?
+    private var lastEncodeTime: Date = Date()
+    private var watchdogTimer: DispatchSourceTimer?
     
     public init(width: Int32 = 480, height: Int32 = 800, fps: Int32 = 30, bitrate: Int32 = 1_200_000) {
         self.width = width
@@ -80,10 +85,40 @@ public final class H264Encoder: ObservableObject {
         VTCompressionSessionPrepareToEncodeFrames(session)
         self.compressionSession = session
         self.isEncoding = true
-        Logger.shared.success("✅ H.264 Hardware VideoToolbox Encoder Ready (Baseline AutoLevel, Realtime)")
+        
+        // Start watchdog timer to repeat frames (matching Android's repeat-previous-frame-after = 100ms)
+        self.lastPixelBuffer = nil
+        self.lastEncodeTime = Date()
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
+        timer.schedule(deadline: .now() + 0.1, repeating: 0.1)
+        timer.setEventHandler { [weak self] in
+            guard let self = self, self.isEncoding else { return }
+            let now = Date()
+            if now.timeIntervalSince(self.lastEncodeTime) >= 0.1, let pixelBuffer = self.lastPixelBuffer, let session = self.compressionSession {
+                let pts = CMTime(value: Int64(CACurrentMediaTime() * 1_000_000_000), timescale: 1_000_000_000)
+                var flags: VTEncodeInfoFlags = []
+                VTCompressionSessionEncodeFrame(
+                    session,
+                    imageBuffer: pixelBuffer,
+                    presentationTimeStamp: pts,
+                    duration: .invalid,
+                    frameProperties: nil,
+                    sourceFrameRefcon: nil,
+                    infoFlagsOut: &flags
+                )
+            }
+        }
+        timer.resume()
+        self.watchdogTimer = timer
+        
+        Logger.shared.success("✅ H.264 Hardware VideoToolbox Encoder Ready (High AutoLevel, Realtime)")
     }
     
     public func stopSession() {
+        watchdogTimer?.cancel()
+        watchdogTimer = nil
+        lastPixelBuffer = nil
+        
         guard isEncoding, let session = compressionSession else { return }
         isEncoding = false
         compressionSession = nil
@@ -96,6 +131,9 @@ public final class H264Encoder: ObservableObject {
     
     public func encode(pixelBuffer: CVPixelBuffer, presentationTimeStamp: CMTime) {
         guard isEncoding, let session = compressionSession else { return }
+        
+        lastPixelBuffer = pixelBuffer
+        lastEncodeTime = Date()
         
         var flags: VTEncodeInfoFlags = []
         let status = VTCompressionSessionEncodeFrame(
