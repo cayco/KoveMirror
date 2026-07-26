@@ -487,6 +487,12 @@ public final class PocketStealthManager: ObservableObject {
     
     deinit {
         UIDevice.current.isProximityMonitoringEnabled = false
+        setSystemBrightness(originalBrightness > 0 ? originalBrightness : 0.5)
+    }
+    
+    private func getCurrentBrightness() -> CGFloat {
+        if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+            return windowScene.screen.brightness
         } else if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             return windowScene.screen.brightness
         }
@@ -577,6 +583,5 @@ public struct PocketStealthOverlayView: View {
         }, onPressingChanged: { pressing in
             isHolding = pressing
         })
->>>>>>> Stashed changes
     }
 }
