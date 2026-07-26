@@ -237,6 +237,44 @@ struct MainDashboardView: View {
                     }
                     .padding()
                 }
+                
+                // Full Screen Tap-to-Wake Stealth Overlay
+                if isStealthModeActive {
+                    Color.black
+                        .ignoresSafeArea()
+                        .overlay(
+                            VStack(spacing: 12) {
+                                Image(systemName: "moon.fill")
+                                    .font(.system(size: 44))
+                                    .foregroundColor(.cyan.opacity(0.3))
+                                
+                                Text("POCKET STEALTH MODE ACTIVE")
+                                    .font(.caption)
+                                    .fontWeight(.black)
+                                    .foregroundColor(.white.opacity(0.4))
+                                
+                                Text("Tap anywhere on screen to wake up")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray.opacity(0.6))
+                            }
+                        )
+                        .onTapGesture {
+                            isStealthModeActive = false
+                        }
+                        .onAppear {
+                            #if canImport(UIKit)
+                            UIDevice.current.isProximityMonitoringEnabled = true
+                            previousBrightness = UIScreen.main.brightness
+                            UIScreen.main.brightness = 0.0
+                            #endif
+                        }
+                        .onDisappear {
+                            #if canImport(UIKit)
+                            UIDevice.current.isProximityMonitoringEnabled = false
+                            UIScreen.main.brightness = max(0.5, previousBrightness)
+                            #endif
+                        }
+                }
             }
             .navigationTitle("KoveMirror")
         }
