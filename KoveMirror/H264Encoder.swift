@@ -128,7 +128,7 @@ public final class H264Encoder: ObservableObject {
         // Extract SPS & PPS NAL units if KeyFrame (IDR)
         if isKeyFrame {
             var paramSetCount: Int = 0
-            var status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+            let status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
                 formatDescription,
                 parameterSetIndex: 0,
                 parameterSetPointerOut: nil,
