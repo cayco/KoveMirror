@@ -119,19 +119,38 @@ public final class ScreenCaptureManager: ObservableObject {
             let bytesPerRow = Int(UInt32(bytes[6]) << 24 | UInt32(bytes[7]) << 16 | UInt32(bytes[8]) << 8 | UInt32(bytes[9]))
             let dataSize = Int(UInt32(bytes[10]) << 24 | UInt32(bytes[11]) << 16 | UInt32(bytes[12]) << 8 | UInt32(bytes[13]))
             
-            connection.receive(minimumIncompleteLength: dataSize, maximumLength: dataSize) { [weak self] frameData, _, isComplete, error in
-                guard let self = self, let data = frameData, data.count == dataSize else {
-                    if !isComplete && error == nil {
-                        self?.readIPCFrameData(connection)
-                    }
-                    return
+            self.readIPCPayload(connection: connection, remainingBytes: dataSize, accumulated: Data()) { [weak self] frameData in
+                if let data = frameData {
+                    self?.processRawFrameBytes(data, width: frameWidth, height: frameHeight, bytesPerRow: bytesPerRow)
                 }
-                
-                self.processRawFrameBytes(data, width: frameWidth, height: frameHeight, bytesPerRow: bytesPerRow)
-                
-                if !isComplete && error == nil {
-                    self.readIPCFrameData(connection)
-                }
+                self?.readIPCFrameData(connection)
+            }
+        }
+    }
+    
+    private func readIPCPayload(connection: NWConnection, remainingBytes: Int, accumulated: Data, completion: @escaping (Data?) -> Void) {
+        if remainingBytes <= 0 {
+            completion(accumulated)
+            return
+        }
+        
+        let chunkSize = min(remainingBytes, 65536)
+        connection.receive(minimumIncompleteLength: 1, maximumLength: chunkSize) { [weak self] content, _, isComplete, error in
+            guard let data = content, !data.isEmpty else {
+                completion(nil)
+                return
+            }
+            
+            var nextAccumulated = accumulated
+            nextAccumulated.append(data)
+            let nextRemaining = remainingBytes - data.count
+            
+            if nextRemaining <= 0 {
+                completion(nextAccumulated)
+            } else if !isComplete && error == nil {
+                self?.readIPCPayload(connection: connection, remainingBytes: nextRemaining, accumulated: nextAccumulated, completion: completion)
+            } else {
+                completion(nil)
             }
         }
     }

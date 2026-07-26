@@ -2,6 +2,7 @@ import ReplayKit
 import CoreVideo
 import CoreMedia
 import Network
+import VideoToolbox
 
 /// ReplayKit Broadcast Upload Extension Handler for KoveMirror
 /// Captures full system screen (Google Maps, Waze, Scenic, OsmAnd) and transmits frames
@@ -13,9 +14,16 @@ public class SampleHandler: RPBroadcastSampleHandler {
     private var isConnected = false
     private let ipcPort: UInt16 = 19890
     private let sendQueue = DispatchQueue(label: "com.kovemirror.broadcast.send", qos: .userInteractive)
+    
+    // VTPixelTransferSession & Pool for hardware downscaling to TFT resolution
+    private var transferSession: VTPixelTransferSession?
+    private var scaledBufferPool: CVPixelBufferPool?
+    private let targetWidth = 480
+    private let targetHeight = 800
 
     override public func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         super.broadcastStarted(withSetupInfo: setupInfo)
+        setupTransferSession()
         connectToHostApp()
     }
 
@@ -32,13 +40,45 @@ public class SampleHandler: RPBroadcastSampleHandler {
         connection?.cancel()
         connection = nil
         isConnected = false
+        if let session = transferSession {
+            VTPixelTransferSessionInvalidate(session)
+            transferSession = nil
+        }
+        scaledBufferPool = nil
     }
 
     override public func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         guard sampleBufferType == .video else { return }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        sendPixelBuffer(pixelBuffer)
+        // Hardware-downscale to target TFT resolution (480x800) before IPC transfer
+        let scaledBuffer = scalePixelBuffer(pixelBuffer) ?? pixelBuffer
+        sendPixelBuffer(scaledBuffer)
+    }
+    
+    private func setupTransferSession() {
+        VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault, pixelTransferSessionOut: &transferSession)
+    }
+    
+    private func scalePixelBuffer(_ sourceBuffer: CVPixelBuffer) -> CVPixelBuffer? {
+        if scaledBufferPool == nil {
+            let poolAttrs: [String: Any] = [kCVPixelBufferPoolMinimumBufferCountKey as String: 4]
+            let bufferAttrs: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: targetWidth,
+                kCVPixelBufferHeightKey as String: targetHeight,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ]
+            CVPixelBufferPoolCreate(kCFAllocatorDefault, poolAttrs as CFDictionary, bufferAttrs as CFDictionary, &scaledBufferPool)
+        }
+        
+        guard let pool = scaledBufferPool else { return nil }
+        var destinationBuffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &destinationBuffer)
+        guard let dest = destinationBuffer, let session = transferSession else { return nil }
+        
+        let status = VTPixelTransferSessionTransferImage(session, from: sourceBuffer, to: dest)
+        return status == noErr ? dest : nil
     }
 
     // MARK: - Local Loopback IPC Connection
@@ -97,3 +137,4 @@ public class SampleHandler: RPBroadcastSampleHandler {
         connection.send(content: packet, completion: .idempotent)
     }
 }
+

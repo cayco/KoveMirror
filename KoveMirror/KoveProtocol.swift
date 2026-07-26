@@ -177,7 +177,8 @@ public enum KoveProtocol {
         let nameBytes = Array(clientName.utf8)
         let copyLen = min(nameBytes.count, 64)
         
-        header.replaceSubrange(0..<copyLen, with: nameBytes[0..<copyLen])
+        // CRITICAL FIX: Byte 0 is 0x00. Client name ("android") starts at index 1
+        header.replaceSubrange(1..<(1 + copyLen), with: nameBytes[0..<copyLen])
         
         let bigWidth = width.bigEndian
         let bigHeight = height.bigEndian
@@ -195,3 +196,4 @@ public enum KoveProtocol {
         return header
     }
 }
+
