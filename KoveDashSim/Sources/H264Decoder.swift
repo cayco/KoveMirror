@@ -160,23 +160,28 @@ public final class H264Decoder: ObservableObject {
         blockData.append(nalData)
         
         let dataCount = blockData.count
-        var blockBuffer: CMBlockBuffer?
-        let blockStatus = blockData.withUnsafeMutableBytes { buf -> OSStatus in
-            guard let ptr = buf.baseAddress else { return kCMBlockBufferNoErr }
-            return CMBlockBufferCreateWithMemoryBlock(
-                allocator: kCFAllocatorDefault,
-                memoryBlock: ptr,
-                blockLength: dataCount,
-                blockAllocator: kCFAllocatorNull,
-                customBlockSource: nil,
-                offsetToData: 0,
-                dataLength: dataCount,
-                flags: 0,
-                blockBufferOut: &blockBuffer
-            )
-        }
         
-        guard blockStatus == noErr, let blockBuffer = blockBuffer else { return }
+        // Allocate heap memory that outlives stack scope and hand ownership to CMBlockBuffer via kCFAllocatorDefault
+        let memoryBlock = UnsafeMutableRawPointer.allocate(byteCount: dataCount, alignment: 1)
+        blockData.copyBytes(to: memoryBlock.assumingMemoryBound(to: UInt8.self), count: dataCount)
+        
+        var blockBuffer: CMBlockBuffer?
+        let blockStatus = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault,
+            memoryBlock: memoryBlock,
+            blockLength: dataCount,
+            blockAllocator: kCFAllocatorDefault,
+            customBlockSource: nil,
+            offsetToData: 0,
+            dataLength: dataCount,
+            flags: 0,
+            blockBufferOut: &blockBuffer
+        )
+        
+        guard blockStatus == noErr, let blockBuffer = blockBuffer else {
+            memoryBlock.deallocate()
+            return
+        }
         
         var sampleBuffer: CMSampleBuffer?
         var sampleSizeArray = [blockData.count]
@@ -201,11 +206,13 @@ public final class H264Decoder: ObservableObject {
         )
         
         if sampleStatus == noErr, let sampleBuffer = sampleBuffer {
-            if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true),
-               CFArrayGetCount(attachments) > 0 {
+            if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) {
                 let dict = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
-                let displayKey = Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque()
-                CFDictionarySetValue(dict, displayKey, Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
+                CFDictionarySetValue(
+                    dict,
+                    unsafeBitCast(kCMSampleAttachmentKey_DisplayImmediately, to: UnsafeRawPointer.self),
+                    unsafeBitCast(kCFBooleanTrue, to: UnsafeRawPointer.self)
+                )
             }
             
             delegate?.decoder(self, didOutputSampleBuffer: sampleBuffer)

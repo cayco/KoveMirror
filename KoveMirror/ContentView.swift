@@ -1,42 +1,50 @@
 import SwiftUI
 import ReplayKit
+import Combine
 
 struct ContentView: View {
     @StateObject private var mirrorService = KoveMirrorService()
+    @StateObject private var stealthManager = PocketStealthManager()
     @State private var selectedTab = 0
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Tab 0: Dashboard & Controls
-            MainDashboardView(mirrorService: mirrorService)
-                .tabItem {
-                    Label("Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent")
-                }
-                .tag(0)
+        ZStack {
+            TabView(selection: $selectedTab) {
+                // Tab 0: Dashboard & Controls
+                MainDashboardView(mirrorService: mirrorService, stealthManager: stealthManager)
+                    .tabItem {
+                        Label("Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent")
+                    }
+                    .tag(0)
+                
+                // Tab 1: Live Navigation Mirror Canvas
+                NavigationMirrorView(mirrorService: mirrorService)
+                    .tabItem {
+                        Label("Live Mirror", systemImage: "map.fill")
+                    }
+                    .tag(1)
+                
+                // Tab 2: Settings
+                SettingsView(mirrorService: mirrorService)
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+                    .tag(2)
+                
+                // Tab 3: Diagnostic Logs
+                LogsView()
+                    .tabItem {
+                        Label("Logs", systemImage: "terminal.fill")
+                    }
+                    .tag(3)
+            }
+            .accentColor(.cyan)
+            .preferredColorScheme(.dark)
             
-            // Tab 1: Live Navigation Mirror Canvas
-            NavigationMirrorView(mirrorService: mirrorService)
-                .tabItem {
-                    Label("Live Mirror", systemImage: "map.fill")
-                }
-                .tag(1)
-            
-            // Tab 2: Settings
-            SettingsView(mirrorService: mirrorService)
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(2)
-            
-            // Tab 3: Diagnostic Logs
-            LogsView()
-                .tabItem {
-                    Label("Logs", systemImage: "terminal.fill")
-                }
-                .tag(3)
+            if stealthManager.isStealthActive {
+                PocketStealthOverlayView(stealthManager: stealthManager)
+            }
         }
-        .accentColor(.cyan)
-        .preferredColorScheme(.dark)
     }
 }
 
@@ -44,6 +52,7 @@ struct MainDashboardView: View {
     @ObservedObject var mirrorService: KoveMirrorService
     @State private var isStealthModeActive = false
     @State private var previousBrightness: CGFloat = 0.5
+    @ObservedObject var stealthManager: PocketStealthManager
     
     var body: some View {
         NavigationView {
@@ -143,6 +152,35 @@ struct MainDashboardView: View {
                         .background(Color(red: 0.12, green: 0.14, blue: 0.18))
                         .cornerRadius(18)
                         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        
+                        // Pocket Stealth Mode Card
+                        VStack(spacing: 12) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "moon.stars.fill")
+                                            .foregroundColor(.cyan)
+                                        Text("POCKET STEALTH MODE")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.cyan)
+                                    }
+                                    
+                                    Text("OLED pitch black, 0% display power, 2s lock")
+                                        .font(.caption2)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Spacer()
+                                
+                                Toggle("", isOn: $stealthManager.isStealthActive)
+                                    .toggleStyle(SwitchToggleStyle(tint: .cyan))
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(red: 0.12, green: 0.14, blue: 0.18))
+                        .cornerRadius(18)
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.cyan.opacity(0.2), lineWidth: 1))
                         
                         // Status Matrix Grid
                         VStack(alignment: .leading, spacing: 12) {
@@ -419,5 +457,126 @@ struct StatusBadge: View {
         .padding(.vertical, 4)
         .background(isActive ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
         .cornerRadius(8)
+    }
+}
+
+// MARK: - Pocket Stealth Mode Manager & Overlay
+
+public final class PocketStealthManager: ObservableObject {
+    @Published public var isStealthActive: Bool = false {
+        didSet {
+            updateStealthState()
+        }
+    }
+    @Published public private(set) var isProximityCovered: Bool = false
+    @Published public private(set) var originalBrightness: CGFloat = 0.5
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    public init() {
+        UIDevice.current.isProximityMonitoringEnabled = true
+        NotificationCenter.default.publisher(for: UIDevice.proximityStateDidChangeNotification)
+            .sink { [weak self] _ in
+                self?.isProximityCovered = UIDevice.current.proximityState
+                if self?.isStealthActive == true {
+                    self?.updateStealthState()
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    deinit {
+        UIDevice.current.isProximityMonitoringEnabled = false
+        } else if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            return windowScene.screen.brightness
+        }
+        return UIScreen.main.brightness
+    }
+    
+    private func setSystemBrightness(_ val: CGFloat) {
+        let clamped = max(0.0, min(1.0, val))
+        let apply = {
+            if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                windowScene.screen.brightness = clamped
+            } else if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                windowScene.screen.brightness = clamped
+            }
+            UIScreen.main.brightness = clamped
+        }
+        if Thread.isMainThread {
+            apply()
+        } else {
+            DispatchQueue.main.async(execute: apply)
+        }
+    }
+    
+    private func updateStealthState() {
+        let apply = {
+            if self.isStealthActive {
+                let current = self.getCurrentBrightness()
+                if current > 0.05 {
+                    self.originalBrightness = current
+                }
+                self.setSystemBrightness(0.0)
+                UIApplication.shared.isIdleTimerDisabled = true
+                UIDevice.current.isProximityMonitoringEnabled = true
+                Logger.shared.info("🌙 Pocket Stealth Mode ENABLED (OLED Pitch Black, Proximity Sensor Active, 2s Long-Press Lock)")
+            } else {
+                self.setSystemBrightness(self.originalBrightness > 0 ? self.originalBrightness : 0.5)
+                UIDevice.current.isProximityMonitoringEnabled = false
+                Logger.shared.info("☀️ Pocket Stealth Mode DISABLED")
+            }
+        }
+        if Thread.isMainThread {
+            apply()
+        } else {
+            DispatchQueue.main.async(execute: apply)
+        }
+    }
+    
+    public func exitStealth() {
+        isStealthActive = false
+    }
+}
+
+public struct PocketStealthOverlayView: View {
+    @ObservedObject var stealthManager: PocketStealthManager
+    @State private var isHolding = false
+    
+    public init(stealthManager: PocketStealthManager) {
+        self.stealthManager = stealthManager
+    }
+    
+    public var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea(.all, edges: .all)
+            
+            if !stealthManager.isProximityCovered {
+                VStack(spacing: 16) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.cyan.opacity(isHolding ? 0.9 : 0.4))
+                        .scaleEffect(isHolding ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: isHolding)
+                    
+                    Text("POCKET STEALTH MODE ACTIVE")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundColor(.white.opacity(0.6))
+                    
+                    Text(isHolding ? "Keep holding to unlock..." : "Press and hold screen for 2s to unlock")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.gray.opacity(0.7))
+                }
+            }
+        }
+        .statusBar(hidden: stealthManager.isStealthActive)
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 2.0, perform: {
+            stealthManager.exitStealth()
+        }, onPressingChanged: { pressing in
+            isHolding = pressing
+        })
+>>>>>>> Stashed changes
     }
 }

@@ -21,6 +21,7 @@ public final class KoveDashClient: ObservableObject {
     
     public let decoder = H264Decoder()
     private var videoHeaderParsed = false
+    private var videoHeaderBuffer = Data()
     private var discoveryConnections: [NWConnection] = []
     
     public init() {}
@@ -160,6 +161,7 @@ public final class KoveDashClient: ObservableObject {
         isHeartbeatConnected = false
         isConnected = false
         videoHeaderParsed = false
+        videoHeaderBuffer.removeAll()
         
         decoder.reset()
         Logger.shared.info("🔌 Disconnected from Kove Mirror Server")
@@ -262,10 +264,17 @@ public final class KoveDashClient: ObservableObject {
                 
                 var payload = data
                 
-                if !self.videoHeaderParsed && payload.count >= 69 {
-                    self.parseVideoHeader(payload.prefix(69))
-                    payload = payload.dropFirst(69)
-                    self.videoHeaderParsed = true
+                if !self.videoHeaderParsed {
+                    self.videoHeaderBuffer.append(payload)
+                    if self.videoHeaderBuffer.count >= 69 {
+                        let headerData = self.videoHeaderBuffer.prefix(69)
+                        self.parseVideoHeader(Data(headerData))
+                        payload = self.videoHeaderBuffer.dropFirst(69)
+                        self.videoHeaderBuffer.removeAll()
+                        self.videoHeaderParsed = true
+                    } else {
+                        payload = Data()
+                    }
                 }
                 
                 if !payload.isEmpty {
