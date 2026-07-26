@@ -138,10 +138,9 @@ public final class KoveBLEManager: NSObject, ObservableObject {
         // 3. Language configuration
         sendJSON(KoveProtocol.makeLanguageSettingJSON())
         
-        // 4. Clock sync sequence (Mandatory 2-packet protocol sequence: tag -1 then tag 0)
+        // 4. Clock sync sequence
         let date = Date()
-        sendJSON(KoveProtocol.makeClockSyncJSON(date: date, tag: -1))
-        sendJSON(KoveProtocol.makeClockSyncJSON(date: date, tag: 0))
+        sendJSON(KoveProtocol.makeClockSyncJSON(date: date))
     }
 }
 
@@ -263,10 +262,8 @@ extension KoveBLEManager: CBPeripheralDelegate {
                 if msgId == 27 && act == "send_pairresult" && result == 1 {
                     Logger.shared.success("✅ Pairing confirmed by TFT! Activating mirror status...")
                     onMirrorRequested?()
-                    
                     sendJSON(KoveProtocol.makeMirrorStatusJSON(enabled: true))
                     sendJSON(KoveProtocol.makeRecordStatusJSON(enabled: true))
-                    sendJSON(KoveProtocol.makeCarInfoQueryJSON())
                 }
             }
         } else {

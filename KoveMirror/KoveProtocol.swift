@@ -53,7 +53,7 @@ public enum KoveProtocol {
         ]
     }
     
-    public static func makeClockSyncJSON(date: Date = Date(), tag: Int = -1) -> [String: Any] {
+    public static func makeClockSyncJSON(date: Date = Date()) -> [String: Any] {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -61,8 +61,7 @@ public enum KoveProtocol {
         
         return [
             "msg_id": 11,
-            "time": dateString,
-            "tag": tag
+            "time": dateString
         ]
     }
     
