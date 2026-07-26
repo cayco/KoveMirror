@@ -15,17 +15,22 @@
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
-	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>NSExtensionPointName</key>
+			<string>com.apple.replaykit-broadcast-upload-extension</string>
+		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<key>com.apple.replaykit-broadcast-upload-extension</key>
 		<key>NSExtensionPrincipalClass</key>
-		<string>SampleHandler</string>
+		<string>$(PRODUCT_MODULE_NAME).SampleHandler</string>
 		<key>RPBroadcastProcessMode</key>
 		<string>RPBroadcastProcessModeSampleBuffer</string>
 	</dict>
