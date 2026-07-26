@@ -22,6 +22,7 @@ public final class H264Encoder: ObservableObject {
     private var lastPixelBuffer: CVPixelBuffer?
     private var lastEncodeTime: Date = Date()
     private var watchdogTimer: DispatchSourceTimer?
+    private let encodeLock = NSLock()
     
     public init(width: Int32 = 480, height: Int32 = 800, fps: Int32 = 30, bitrate: Int32 = 1_200_000) {
         self.width = width
@@ -87,19 +88,28 @@ public final class H264Encoder: ObservableObject {
         self.isEncoding = true
         
         // Start watchdog timer to repeat frames (matching Android's repeat-previous-frame-after = 100ms)
+        encodeLock.lock()
         self.lastPixelBuffer = nil
         self.lastEncodeTime = Date()
+        encodeLock.unlock()
+        
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
         timer.schedule(deadline: .now() + 0.1, repeating: 0.1)
         timer.setEventHandler { [weak self] in
             guard let self = self, self.isEncoding else { return }
+            self.encodeLock.lock()
             let now = Date()
-            if now.timeIntervalSince(self.lastEncodeTime) >= 0.1, let pixelBuffer = self.lastPixelBuffer, let session = self.compressionSession {
+            let shouldEncode = now.timeIntervalSince(self.lastEncodeTime) >= 0.1
+            let pixelBuffer = self.lastPixelBuffer
+            let session = self.compressionSession
+            self.encodeLock.unlock()
+            
+            if shouldEncode, let pb = pixelBuffer, let s = session {
                 let pts = CMTime(value: Int64(CACurrentMediaTime() * 1_000_000_000), timescale: 1_000_000_000)
                 var flags: VTEncodeInfoFlags = []
                 VTCompressionSessionEncodeFrame(
-                    session,
-                    imageBuffer: pixelBuffer,
+                    s,
+                    imageBuffer: pb,
                     presentationTimeStamp: pts,
                     duration: .invalid,
                     frameProperties: nil,
@@ -117,7 +127,10 @@ public final class H264Encoder: ObservableObject {
     public func stopSession() {
         watchdogTimer?.cancel()
         watchdogTimer = nil
+        
+        encodeLock.lock()
         lastPixelBuffer = nil
+        encodeLock.unlock()
         
         guard isEncoding, let session = compressionSession else { return }
         isEncoding = false
@@ -132,8 +145,10 @@ public final class H264Encoder: ObservableObject {
     public func encode(pixelBuffer: CVPixelBuffer, presentationTimeStamp: CMTime) {
         guard isEncoding, let session = compressionSession else { return }
         
+        encodeLock.lock()
         lastPixelBuffer = pixelBuffer
         lastEncodeTime = Date()
+        encodeLock.unlock()
         
         var flags: VTEncodeInfoFlags = []
         let status = VTCompressionSessionEncodeFrame(
