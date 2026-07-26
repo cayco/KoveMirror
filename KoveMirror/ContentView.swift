@@ -253,12 +253,16 @@ struct MainDashboardView: View {
                                     .fontWeight(.black)
                                     .foregroundColor(.white.opacity(0.4))
                                 
-                                Text("Tap anywhere on screen to wake up")
+                                Text("Double-tap screen when out of pocket to wake")
                                     .font(.caption2)
                                     .foregroundColor(.gray.opacity(0.6))
                             }
                         )
-                        .onTapGesture {
+                        .onTapGesture(count: 2) {
+                            #if canImport(UIKit)
+                            // Ignore touches if proximity sensor is covered inside pocket/bag
+                            guard !UIDevice.current.proximityState else { return }
+                            #endif
                             isStealthModeActive = false
                         }
                         .onAppear {
