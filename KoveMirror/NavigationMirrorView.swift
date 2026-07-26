@@ -1,279 +1,290 @@
 import SwiftUI
+import MapKit
+import CoreLocation
 import ReplayKit
 
 struct NavigationMirrorView: View {
     @ObservedObject var mirrorService: KoveMirrorService
-    @State private var currentSpeed: Int = 78
-    @State private var heading: String = "NE"
-    @State private var nextTurnDistance: Int = 450
-    
-    let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    @StateObject private var locationManager = LocationDelegate()
+    @State private var searchRadius: String = ""
+    @State private var destinationText: String = ""
+    @State private var route: MKRoute?
+    @State private var isNavigating = false
     
     var body: some View {
         ZStack {
             Color(red: 0.07, green: 0.08, blue: 0.11)
                 .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Header Bar
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Kove 800X Pro TFT")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
-                            
-                            Text("LIVE MIRROR CANVAS")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                                .foregroundColor(.cyan)
-                        }
+            VStack(spacing: 0) {
+                // Header Control Bar
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("KOVE 800X PRO DASH")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.cyan)
                         
-                        Spacer()
-                        
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(mirrorService.screenCapture.isBroadcastIPCActive ? Color.cyan : (mirrorService.screenCapture.isCapturing ? Color.green : Color.orange))
-                                .frame(width: 10, height: 10)
-                            
-                            Text(mirrorService.screenCapture.isBroadcastIPCActive ? "SYSTEM BROADCAST" : (mirrorService.screenCapture.isCapturing ? "IN-APP CAPTURE" : "STANDBY"))
-                                .font(.caption2)
-                                .fontWeight(.black)
-                                .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .cyan : (mirrorService.screenCapture.isCapturing ? .green : .orange))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.08))
-                        .cornerRadius(12)
+                        Text("LIVE MAP NAVIGATION")
+                            .font(.subheadline)
+                            .fontWeight(.heavy)
+                            .foregroundColor(.white)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 10)
                     
-                    // Controls Card
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Image(systemName: "play.tv.fill")
-                                .font(.title2)
-                                .foregroundColor(.cyan)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("SCREEN MIRRORING CONTROLS")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                Text(mirrorService.screenCapture.isCapturing ? "Screen Capture is active" : "Select streaming method below")
-                                    .font(.caption2)
-                                    .foregroundColor(mirrorService.screenCapture.isCapturing ? .green : .gray)
-                            }
-                            Spacer()
-                        }
+                    Spacer()
+                    
+                    // Streaming Status Pill
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(mirrorService.isMirroringActive ? Color.green : Color.orange)
+                            .frame(width: 8, height: 8)
                         
-                        Divider().background(Color.white.opacity(0.1))
-                        
-                        // Mode A: Native In-App ReplayKit Capture (Prompts iOS Permission Directly)
+                        Text(mirrorService.isMirroringActive ? "STREAMING TO TFT" : "CONNECTING...")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundColor(mirrorService.isMirroringActive ? .green : .orange)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.08))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color(red: 0.10, green: 0.12, blue: 0.16))
+                
+                // Destination Search Bar Overlay
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.cyan)
+                    
+                    TextField("Enter destination (e.g. Stelvio Pass)...", text: $destinationText)
+                        .font(.caption)
+                        .foregroundColor(.white)
+                    
+                    if !destinationText.isEmpty {
                         Button(action: {
-                            if mirrorService.screenCapture.isCapturing {
-                                mirrorService.screenCapture.stopCapture()
-                            } else {
-                                mirrorService.screenCapture.startInAppScreenCapture(width: Int(mirrorService.width), height: Int(mirrorService.height))
-                            }
+                            searchDestination()
                         }) {
-                            HStack {
-                                Image(systemName: mirrorService.screenCapture.isCapturing ? "stop.circle.fill" : "record.circle")
-                                    .font(.title3)
+                            Text("ROUTE")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.cyan)
+                                .foregroundColor(.black)
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                
+                // Live Map Canvas Box (Rendered & Streamed Live to Motorcycle TFT)
+                ZStack(alignment: .bottom) {
+                    MapCanvasView(locationManager: locationManager, route: route)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.cyan.opacity(0.4), lineWidth: 1.5))
+                    
+                    // Telemetry & Guidance Overlay (Rendered directly onto TFT output stream)
+                    VStack {
+                        // Top Turn Guidance Banner
+                        if let route = route, let step = route.steps.first(where: { !$0.instructions.isEmpty }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "arrow.turn.up.right")
+                                    .font(.title2)
+                                    .foregroundColor(.green)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(mirrorService.screenCapture.isCapturing ? "STOP IN-APP CAPTURE" : "START IN-APP SCREEN CAPTURE")
-                                        .font(.subheadline)
-                                        .fontWeight(.bold)
-                                    
-                                    Text("Prompts native iOS permission dialog directly")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(mirrorService.screenCapture.isCapturing ? .white.opacity(0.8) : .black.opacity(0.7))
-                                }
-                                
-                                Spacer()
-                            }
-                            .foregroundColor(mirrorService.screenCapture.isCapturing ? .white : .black)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(mirrorService.screenCapture.isCapturing ? Color.red : Color.cyan)
-                            .cornerRadius(14)
-                        }
-                        
-                        // Mode B: System Broadcast Picker (Google Maps / Waze)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("LAUNCH SYSTEM BROADCAST (MAPS/WAZE)")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                Text("Tap picker icon on right to open system broadcast menu")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            SystemBroadcastPickerRepresentable()
-                                .frame(width: 50, height: 50)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(12)
-                        }
-                        .padding(12)
-                        .background(Color.white.opacity(0.05))
-                        .cornerRadius(14)
-                    }
-                    .padding(16)
-                    .background(Color(red: 0.12, green: 0.14, blue: 0.18))
-                    .cornerRadius(18)
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    .padding(.horizontal)
-                    
-                    // Live TFT Output Preview Box
-                    VStack(spacing: 0) {
-                        // Top Status Bar
-                        HStack {
-                            Label("\(currentSpeed) KM/H", systemImage: "speedometer")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.cyan)
-                            
-                            Spacer()
-                            
-                            Text("H.264 Baseline Auto @ 30 FPS")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.green)
-                            
-                            Spacer()
-                            
-                            Text(Date(), style: .time)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.12, green: 0.14, blue: 0.18))
-                        
-                        // Main Canvas Area
-                        ZStack {
-                            if mirrorService.screenCapture.isBroadcastIPCActive || mirrorService.screenCapture.isCapturing {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "tv.and.mediabox.fill")
-                                        .font(.system(size: 48))
-                                        .foregroundColor(.cyan)
-                                    
-                                    Text(mirrorService.screenCapture.isBroadcastIPCActive ? "LIVE SYSTEM BROADCAST ACTIVE" : "IN-APP SCREEN CAPTURE ACTIVE")
+                                    Text(step.instructions)
                                         .font(.caption)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                     
-                                    Text("Screen frames are encoding and streaming over TCP to the motorcycle TFT display.")
-                                        .font(.caption2)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundColor(.gray)
-                                        .padding(.horizontal, 24)
+                                    Text("In \(Int(step.distance)) meters")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.green)
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color(red: 0.09, green: 0.11, blue: 0.15))
-                            } else {
-                                // Fallback / Demo Canvas Grid
-                                Canvas { context, size in
-                                    let gridPath = Path { path in
-                                        for x in stride(from: 0, to: size.width, by: 40) {
-                                            path.move(to: CGPoint(x: x, y: 0))
-                                            path.addLine(to: CGPoint(x: x, y: size.height))
-                                        }
-                                        for y in stride(from: 0, to: size.height, by: 40) {
-                                            path.move(to: CGPoint(x: 0, y: y))
-                                            path.addLine(to: CGPoint(x: size.width, y: y))
-                                        }
-                                    }
-                                    context.stroke(gridPath, with: .color(Color.white.opacity(0.04)), lineWidth: 1)
-                                }
-                                .background(Color(red: 0.09, green: 0.11, blue: 0.15))
-                                
-                                VStack(spacing: 20) {
-                                    HStack(spacing: 16) {
-                                        Image(systemName: "arrow.turn.up.right")
-                                            .font(.system(size: 42, weight: .black))
-                                            .foregroundColor(.green)
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("In \(nextTurnDistance) meters")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.green)
-                                            
-                                            Text("Turn Right on Alpine Pass Rd")
-                                                .font(.headline)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding()
-                                    .background(Color.black.opacity(0.4))
-                                    .cornerRadius(16)
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.3), lineWidth: 1))
-                                    .padding(.horizontal)
-                                    
-                                    Spacer()
-                                    
-                                    VStack(spacing: 0) {
-                                        Text("\(currentSpeed)")
-                                            .font(.system(size: 76, weight: .bold, design: .rounded))
-                                            .foregroundColor(.cyan)
-                                        
-                                        Text("DEMO CANVAS (KM/H)")
-                                            .font(.footnote)
-                                            .fontWeight(.heavy)
-                                            .foregroundColor(.gray)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    HStack(spacing: 20) {
-                                        VStatView(title: "FRONT TIRE", value: "2.4 BAR", icon: "gauge")
-                                        VStatView(title: "REAR TIRE", value: "2.5 BAR", icon: "gauge")
-                                        VStatView(title: "FUEL LEVEL", value: "78%", icon: "fuelpump.fill")
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.bottom, 20)
-                                }
+                                Spacer()
                             }
+                            .padding(12)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(14)
+                            .padding(12)
                         }
+                        
+                        Spacer()
+                        
+                        // Bottom Telemetry Bar
+                        HStack(spacing: 16) {
+                            // Speedometer
+                            VStack(spacing: 0) {
+                                Text("\(Int(max(0, locationManager.speed * 3.6)))")
+                                    .font(.system(size: 38, weight: .black, design: .rounded))
+                                    .foregroundColor(.cyan)
+                                
+                                Text("KM/H")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(14)
+                            
+                            Spacer()
+                            
+                            // Compass Heading
+                            VStack(spacing: 2) {
+                                Image(systemName: "location.north.line.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.cyan)
+                                    .rotationEffect(.degrees(locationManager.heading))
+                                
+                                Text("\(Int(locationManager.heading))°")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(10)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(14)
+                        }
+                        .padding(12)
                     }
-                    .aspectRatio(480.0 / 800.0, contentMode: .fit)
-                    .cornerRadius(24)
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.cyan.opacity(0.3), lineWidth: 2))
-                    .shadow(color: Color.cyan.opacity(0.15), radius: 20, x: 0, y: 10)
-                    .padding(.horizontal)
                 }
-                .padding(.bottom, 20)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                
+                // Instructions Card
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("💡 APPLE DEVELOPER FREE ACCOUNT NOTICE:")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.yellow)
+                    
+                    Text("Free Personal Apple Developer accounts restrict Broadcast Extension targets in Control Center. KoveMirror's built-in Live Navigation Map streams directly to your TFT dash without requiring a paid developer account!")
+                        .font(.system(size: 9))
+                        .foregroundColor(.gray)
+                }
+                .padding(10)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
             }
         }
-        .onReceive(timer) { _ in
-            currentSpeed = Int(70 + 12 * sin(Date().timeIntervalSince1970 * 0.4))
-            nextTurnDistance = max(50, nextTurnDistance - 5)
-            if nextTurnDistance <= 50 { nextTurnDistance = 500 }
+        .onAppear {
+            locationManager.requestPermission()
+            mirrorService.startMirroring()
+        }
+    }
+    
+    private func searchDestination() {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = destinationText
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            guard let mapItem = response?.mapItems.first else { return }
+            
+            let directionsRequest = MKDirections.Request()
+            directionsRequest.source = MKMapItem.forCurrentLocation()
+            directionsRequest.destination = mapItem
+            directionsRequest.transportType = .automobile
+            
+            let directions = MKDirections(request: directionsRequest)
+            directions.calculate { response, error in
+                if let calculatedRoute = response?.routes.first {
+                    DispatchQueue.main.async {
+                        self.route = calculatedRoute
+                        self.isNavigating = true
+                    }
+                }
+            }
         }
     }
 }
 
-struct SystemBroadcastPickerRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 50, height: 50))
-        picker.preferredExtension = "com.kove.mirror.ios.broadcast"
-        picker.showsMicrophoneButton = false
-        return picker
+// MARK: - MapKit Live Canvas View
+
+struct MapCanvasView: UIViewRepresentable {
+    @ObservedObject var locationManager: LocationDelegate
+    var route: MKRoute?
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
+        mapView.userTrackingMode = .followWithHeading
+        mapView.overrideUserInterfaceStyle = .dark
+        mapView.mapType = .standard
+        return mapView
     }
     
-    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        if let route = route {
+            uiView.removeOverlays(uiView.overlays)
+            uiView.addOverlay(route.polyline)
+            uiView.setVisibleMapRect(route.polyline.boundingMapRect, edgePadding: UIEdgeInsets(top: 40, left: 40, bottom: 40, right: 40), animated: true)
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: MapCanvasView
+        
+        init(_ parent: MapCanvasView) {
+            self.parent = parent
+        }
+        
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = .systemCyan
+                renderer.lineWidth = 6
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+    }
+}
+
+// MARK: - CoreLocation Manager Delegate
+
+class LocationDelegate: NSObject, ObservableObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    @Published var speed: CLLocationSpeed = 0.0
+    @Published var heading: CLLocationDirection = 0.0
+    
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        manager.headingFilter = 2
+    }
+    
+    func requestPermission() {
+        manager.requestWhenInUseAuthorization()
+        manager.startUpdatingLocation()
+        manager.startUpdatingHeading()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        if let loc = locations.last {
+            DispatchQueue.main.async {
+                self.speed = max(0, loc.speed)
+            }
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        DispatchQueue.main.async {
+            self.heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        }
+    }
 }
 
 struct VStatView: View {
