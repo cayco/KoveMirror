@@ -268,7 +268,7 @@ struct NavigationMirrorView: View {
 struct SystemBroadcastPickerRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
         let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 50, height: 50))
-        picker.preferredExtension = "pl.cayco.kovemirror.broadcast"
+        picker.preferredExtension = "pl.cayco.kovemirror.ios.broadcast"
         picker.showsMicrophoneButton = false
         return picker
     }
