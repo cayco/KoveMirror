@@ -272,7 +272,7 @@ public final class KoveTCPManager: ObservableObject {
     private func startVideoHeartbeat() {
         videoHeartbeatTimer?.cancel()
         
-        let timer = DispatchSource.makeTimerSource(queue: queue)
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .background))
         timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
         timer.setEventHandler { [weak self] in
             guard let self = self, let connection = self.videoConnection, self.isVideoConnected else { return }
@@ -367,7 +367,7 @@ public final class KoveTCPManager: ObservableObject {
     private func startDedicatedHeartbeatPing() {
         dedicatedHeartbeatTimer?.cancel()
         
-        let timer = DispatchSource.makeTimerSource(queue: queue)
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .background))
         timer.schedule(deadline: .now() + 0.2, repeating: 0.2)
         timer.setEventHandler { [weak self] in
             guard let self = self, let connection = self.heartbeatConnection, self.isHeartbeatConnected else { return }
