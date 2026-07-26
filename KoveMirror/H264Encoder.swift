@@ -23,6 +23,7 @@ public final class H264Encoder: ObservableObject {
     private var lastEncodeTime: Date = Date()
     private var watchdogTimer: DispatchSourceTimer?
     private let encodeLock = NSLock()
+    private var needsKeyFrame: Bool = true
     
     public init(width: Int32 = 480, height: Int32 = 800, fps: Int32 = 30, bitrate: Int32 = 1_200_000) {
         self.width = width
@@ -91,6 +92,7 @@ public final class H264Encoder: ObservableObject {
         encodeLock.lock()
         self.lastPixelBuffer = nil
         self.lastEncodeTime = Date()
+        self.needsKeyFrame = true
         encodeLock.unlock()
         
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
@@ -102,17 +104,28 @@ public final class H264Encoder: ObservableObject {
             let shouldEncode = now.timeIntervalSince(self.lastEncodeTime) >= 0.1
             let pixelBuffer = self.lastPixelBuffer
             let session = self.compressionSession
+            let forceKeyFrame = self.needsKeyFrame
+            self.needsKeyFrame = false
             self.encodeLock.unlock()
             
             if shouldEncode, let pb = pixelBuffer, let s = session {
                 let pts = CMTime(value: Int64(CACurrentMediaTime() * 1_000_000_000), timescale: 1_000_000_000)
                 var flags: VTEncodeInfoFlags = []
+                var frameProperties: CFDictionary? = nil
+                
+                if forceKeyFrame {
+                    let key = kVTEncodeFrameOptionKey_ForceKeyFrame
+                    let value = kCFBooleanTrue
+                    let dict = [key: value] as CFDictionary
+                    frameProperties = dict
+                }
+                
                 VTCompressionSessionEncodeFrame(
                     s,
                     imageBuffer: pb,
                     presentationTimeStamp: pts,
                     duration: .invalid,
-                    frameProperties: nil,
+                    frameProperties: frameProperties,
                     sourceFrameRefcon: nil,
                     infoFlagsOut: &flags
                 )
@@ -148,15 +161,27 @@ public final class H264Encoder: ObservableObject {
         encodeLock.lock()
         lastPixelBuffer = pixelBuffer
         lastEncodeTime = Date()
+        let forceKeyFrame = needsKeyFrame
+        needsKeyFrame = false
         encodeLock.unlock()
         
         var flags: VTEncodeInfoFlags = []
+        var frameProperties: CFDictionary? = nil
+        
+        if forceKeyFrame {
+            let key = kVTEncodeFrameOptionKey_ForceKeyFrame
+            let value = kCFBooleanTrue
+            let dict = [key: value] as CFDictionary
+            frameProperties = dict
+            Logger.shared.info("🔑 Forcing IDR Keyframe for stream initialization")
+        }
+        
         let status = VTCompressionSessionEncodeFrame(
             session,
             imageBuffer: pixelBuffer,
             presentationTimeStamp: presentationTimeStamp,
             duration: .invalid,
-            frameProperties: nil,
+            frameProperties: frameProperties,
             sourceFrameRefcon: nil,
             infoFlagsOut: &flags
         )
