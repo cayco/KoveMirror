@@ -40,12 +40,17 @@ public final class H264Encoder: ObservableObject {
         Logger.shared.info("🎬 Initializing H.264 VideoToolbox Encoder (\(self.width)x\(self.height) @ \(fps) FPS, \(bitrate / 1000) Kbps)...")
         
         var session: VTCompressionSession?
+        let encoderSpec: [String: Any] = [
+            "EnableHardwareAcceleratedVideoEncoder": true,
+            "RequireHardwareAcceleratedVideoEncoder": false
+        ]
+        
         let status = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,
             width: self.width,
             height: self.height,
             codecType: kCMVideoCodecType_H264,
-            encoderSpecification: nil,
+            encoderSpecification: encoderSpec as CFDictionary,
             imageBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: self.width,
@@ -104,7 +109,8 @@ public final class H264Encoder: ObservableObject {
         )
         
         if status != noErr {
-            Logger.shared.error("Frame encode error: \(status)")
+            Logger.shared.error("Frame encode error: \(status). Attempting to restart session...")
+            startSession(width: self.width, height: self.height)
         }
     }
     

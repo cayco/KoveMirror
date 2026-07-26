@@ -76,97 +76,33 @@ struct MainDashboardView: View {
                             
                             Divider().background(Color.white.opacity(0.1))
                             
-                            // Master Toggle Button
+                            // Master Toggle Button with Programmatic Broadcast Picker Trigger
                             Button(action: {
-                                if mirrorService.isMirroringActive {
-                                    mirrorService.stopMirroring()
-                                } else {
+                                if !mirrorService.isMirroringActive {
                                     mirrorService.startMirroring()
                                 }
+                                BroadcastTrigger.shared.trigger()
                             }) {
+                                let isBroadcastActive = mirrorService.screenCapture.isBroadcastIPCActive
                                 HStack {
-                                    Image(systemName: mirrorService.isMirroringActive ? "stop.fill" : "play.fill")
-                                    Text(mirrorService.isMirroringActive ? "STOP MIRRORING" : "START MIRRORING")
+                                    Image(systemName: isBroadcastActive ? "stop.fill" : "play.fill")
+                                    Text(isBroadcastActive ? "STOP MIRRORING" : "START MIRRORING")
                                         .fontWeight(.bold)
                                 }
                                 .font(.headline)
-                                .foregroundColor(mirrorService.isMirroringActive ? .white : .black)
+                                .foregroundColor(isBroadcastActive ? .white : .black)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(mirrorService.isMirroringActive ? Color.red : Color.cyan)
+                                .background(isBroadcastActive ? Color.red : Color.cyan)
                                 .cornerRadius(16)
-                                .shadow(color: (mirrorService.isMirroringActive ? Color.red : Color.cyan).opacity(0.4), radius: 10, x: 0, y: 5)
+                                .shadow(color: (isBroadcastActive ? Color.red : Color.cyan).opacity(0.4), radius: 10, x: 0, y: 5)
                             }
+                            .background(BroadcastTriggerView().frame(width: 0, height: 0))
                         }
                         .padding(20)
                         .background(Color(red: 0.12, green: 0.14, blue: 0.18))
                         .cornerRadius(24)
                         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                        
-                        // Full System Screen Casting Card (Google Maps, Waze, Scenic, OsmAnd)
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "tv.badge.wifi.fill")
-                                            .foregroundColor(.green)
-                                        Text("FULL SYSTEM SCREEN CASTING")
-                                            .font(.caption)
-                                            .fontWeight(.black)
-                                            .foregroundColor(.green)
-                                    }
-                                    
-                                    Text("Cast Google Maps, Waze, OsmAnd to TFT")
-                                        .font(.subheadline)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                }
-                                
-                                Spacer()
-                                
-                                StatusBadge(
-                                    isActive: mirrorService.screenCapture.isBroadcastIPCActive,
-                                    activeTitle: "BROADCAST LIVE",
-                                    inactiveTitle: "READY"
-                                )
-                            }
-                            
-                            Text("Tap the broadcast button on the right to start system screen recording. Your entire iPhone screen will be mirrored to the motorcycle display.")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                                .lineLimit(2)
-                            
-                            Divider().background(Color.white.opacity(0.1))
-                            
-                            HStack(spacing: 12) {
-                                Image(systemName: "hand.tap.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.cyan)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("TAP TO START SYSTEM BROADCAST")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                    
-                                    Text("Select 'KoveMirror Broadcast' in system prompt")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.cyan)
-                                }
-                                
-                                Spacer()
-                                
-                                MainDashboardBroadcastPickerRepresentable()
-                                    .frame(width: 54, height: 54)
-                                    .background(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green.opacity(0.2) : Color.cyan.opacity(0.2))
-                                    .cornerRadius(14)
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green : Color.cyan, lineWidth: 1.5))
-                            }
-                        }
-                        .padding(18)
-                        .background(Color(red: 0.10, green: 0.14, blue: 0.16))
-                        .cornerRadius(22)
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green.opacity(0.5) : Color.cyan.opacity(0.3), lineWidth: 1.5))
 
                         
                         // Pocket Stealth Mode Control Card
@@ -435,15 +371,33 @@ struct InstructionStep: View {
     }
 }
 
-struct MainDashboardBroadcastPickerRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 54, height: 54))
-        picker.preferredExtension = "pl.cayco.kovemirror.broadcast"
+class BroadcastTrigger {
+    static let shared = BroadcastTrigger()
+    var picker: RPSystemBroadcastPickerView?
+    
+    func setup() -> UIView {
+        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        picker.preferredExtension = "pl.cayco.kovemirror.ios.broadcasts"
         picker.showsMicrophoneButton = false
+        picker.alpha = 0.0
+        self.picker = picker
         return picker
     }
     
-    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
+    func trigger() {
+        guard let picker = picker else { return }
+        if let button = picker.subviews.first(where: { $0 is UIButton }) as? UIButton {
+            button.sendActions(for: .touchUpInside)
+        }
+    }
+}
+
+struct BroadcastTriggerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        return BroadcastTrigger.shared.setup()
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 struct StatusBadge: View {

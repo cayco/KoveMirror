@@ -7,8 +7,7 @@ import VideoToolbox
 /// ReplayKit Broadcast Upload Extension Handler for KoveMirror
 /// Captures full system screen (Google Maps, Waze, Scenic, OsmAnd) and transmits frames
 /// to the KoveMirror host app via local loopback IPC socket.
-@objc(SampleHandler)
-public class SampleHandler: RPBroadcastSampleHandler {
+class SampleHandler: RPBroadcastSampleHandler {
 
     private var connection: NWConnection?
     private var isConnected = false

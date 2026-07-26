@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import CoreVideo
 import CoreMedia
+import AVFoundation
 
 public final class KoveMirrorService: ObservableObject {
     @Published public var bleManager: KoveBLEManager
@@ -92,6 +93,9 @@ public final class KoveMirrorService: ObservableObject {
         
         // Step B: Start scanning for motorcycle BLE device
         bleManager.startScanning()
+        
+        // Step C: Start Background Keep-Alive to allow streaming while app is minimized
+        BackgroundKeepAlive.shared.start()
     }
     
     public func stopMirroring() {
@@ -101,6 +105,7 @@ public final class KoveMirrorService: ObservableObject {
         encoder.stopSession()
         tcpManager.stopServers()
         bleManager.disconnect()
+        BackgroundKeepAlive.shared.stop()
         
         DispatchQueue.main.async {
             self.isMirroringActive = false
@@ -115,5 +120,67 @@ public final class KoveMirrorService: ObservableObject {
             stopMirroring()
             startMirroring(width: width, height: height)
         }
+    }
+}
+
+public class BackgroundKeepAlive {
+    public static let shared = BackgroundKeepAlive()
+    
+    private var audioEngine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
+    
+    private init() {}
+    
+    public func start() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            let engine = AVAudioEngine()
+            let player = AVAudioPlayerNode()
+            
+            engine.attach(player)
+            
+            let format = engine.outputNode.outputFormat(forBus: 0)
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            
+            try engine.start()
+            
+            let frameCount = AVAudioFrameCount(format.sampleRate) // 1 second buffer
+            if let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) {
+                buffer.frameLength = frameCount
+                if let channelData = buffer.floatChannelData {
+                    for channel in 0..<Int(format.channelCount) {
+                        let ptr = channelData[channel]
+                        for i in 0..<Int(frameCount) {
+                            ptr[i] = 0.0
+                        }
+                    }
+                }
+                player.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+                player.play()
+            }
+            
+            self.audioEngine = engine
+            self.playerNode = player
+            Logger.shared.info("🔊 Background keep-alive (silent audio) started.")
+        } catch {
+            Logger.shared.error("❌ Failed to start background keep-alive: \(error.localizedDescription)")
+        }
+    }
+    
+    public func stop() {
+        playerNode?.stop()
+        audioEngine?.stop()
+        
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+            Logger.shared.info("🔇 Background keep-alive stopped.")
+        } catch {
+            Logger.shared.error("Failed to stop audio session: \(error.localizedDescription)")
+        }
+        
+        playerNode = nil
+        audioEngine = nil
     }
 }

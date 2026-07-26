@@ -163,7 +163,16 @@ public final class ScreenCaptureManager: ObservableObject {
         }
         guard let dest = destBuffer, let session = transferSession else { return nil }
         
-        let status = VTPixelTransferSessionTransferImage(session, from: sourceBuffer, to: dest)
+        var status = VTPixelTransferSessionTransferImage(session, from: sourceBuffer, to: dest)
+        if status != noErr {
+            // Session might be invalidated in background, recreate it
+            VTPixelTransferSessionInvalidate(session)
+            transferSession = nil
+            VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault, pixelTransferSessionOut: &transferSession)
+            if let newSession = transferSession {
+                status = VTPixelTransferSessionTransferImage(newSession, from: sourceBuffer, to: dest)
+            }
+        }
         return status == noErr ? dest : nil
     }
 

@@ -72,60 +72,35 @@ struct NavigationMirrorView: View {
                         
                         Divider().background(Color.white.opacity(0.1))
                         
-                        // Mode A: Native In-App ReplayKit Capture (Prompts iOS Permission Directly)
+                        // START SYSTEM BROADCAST
                         Button(action: {
-                            if mirrorService.screenCapture.isCapturing {
-                                mirrorService.screenCapture.stopCapture()
-                            } else {
-                                mirrorService.screenCapture.startInAppScreenCapture(width: Int(mirrorService.width), height: Int(mirrorService.height))
+                            if !mirrorService.isMirroringActive {
+                                mirrorService.startMirroring()
                             }
+                            BroadcastTrigger.shared.trigger()
                         }) {
                             HStack {
-                                Image(systemName: mirrorService.screenCapture.isCapturing ? "stop.circle.fill" : "record.circle")
+                                Image(systemName: mirrorService.screenCapture.isBroadcastIPCActive ? "stop.circle.fill" : "record.circle")
                                     .font(.title3)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(mirrorService.screenCapture.isCapturing ? "STOP IN-APP CAPTURE" : "START IN-APP SCREEN CAPTURE")
+                                    Text(mirrorService.screenCapture.isBroadcastIPCActive ? "STOP SYSTEM BROADCAST" : "START SYSTEM BROADCAST")
                                         .font(.subheadline)
                                         .fontWeight(.bold)
                                     
-                                    Text("Prompts native iOS permission dialog directly")
+                                    Text("Prompts OS-level dialog to capture whole screen")
                                         .font(.system(size: 10))
-                                        .foregroundColor(mirrorService.screenCapture.isCapturing ? .white.opacity(0.8) : .black.opacity(0.7))
+                                        .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .white.opacity(0.8) : .black.opacity(0.7))
                                 }
                                 
                                 Spacer()
                             }
-                            .foregroundColor(mirrorService.screenCapture.isCapturing ? .white : .black)
+                            .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .white : .black)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(mirrorService.screenCapture.isCapturing ? Color.red : Color.cyan)
+                            .background(mirrorService.screenCapture.isBroadcastIPCActive ? Color.red : Color.cyan)
                             .cornerRadius(14)
                         }
-                        
-                        // Mode B: System Broadcast Picker (Google Maps / Waze)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("LAUNCH SYSTEM BROADCAST (MAPS/WAZE)")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                Text("Tap picker icon on right to open system broadcast menu")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            SystemBroadcastPickerRepresentable()
-                                .frame(width: 50, height: 50)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(12)
-                        }
-                        .padding(12)
-                        .background(Color.white.opacity(0.05))
-                        .cornerRadius(14)
                     }
                     .padding(16)
                     .background(Color(red: 0.12, green: 0.14, blue: 0.18))
@@ -265,16 +240,6 @@ struct NavigationMirrorView: View {
     }
 }
 
-struct SystemBroadcastPickerRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 50, height: 50))
-        picker.preferredExtension = "pl.cayco.kovemirror.ios.broadcast"
-        picker.showsMicrophoneButton = false
-        return picker
-    }
-    
-    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
-}
 
 struct VStatView: View {
     let title: String

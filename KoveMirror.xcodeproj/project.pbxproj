@@ -416,7 +416,7 @@
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.ios.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.ios.broadcasts;
 				PRODUCT_MODULE_NAME = KoveMirrorBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -441,7 +441,7 @@
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.ios.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.ios.broadcasts;
 				PRODUCT_MODULE_NAME = KoveMirrorBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
