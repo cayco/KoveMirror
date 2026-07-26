@@ -223,18 +223,16 @@ public final class KoveTCPManager: ObservableObject {
             switch state {
             case .ready:
                 self.isVideoConnected = true
-                Logger.shared.success("🔌 TFT Video socket connected! Sending VideoSize header...")
-                
-                // 1. Send VideoSize Header (69 bytes)
-                self.sendVideoHeader()
-                
-                // 2. Start Video Heartbeat (every 2 seconds)
                 self.startVideoHeartbeat()
-                
-                // 3. Notify Service to launch H.264 Encoder
-                self.onVideoConnected?()
-                
                 self.readVideoFeedback(connection)
+                
+                // CRITICAL: Send header and wait for it to be processed BEFORE starting video data.
+                // Prevents TCP coalescing which breaks poorly written embedded recv() loops.
+                self.sendVideoHeader { success in
+                    if success {
+                        self.onVideoConnected?()
+                    }
+                }
             case .failed(let err):
                 self.isVideoConnected = false
                 self.stopVideoHeartbeat()
@@ -252,15 +250,21 @@ public final class KoveTCPManager: ObservableObject {
         connection.start(queue: .main)
     }
     
-    private func sendVideoHeader() {
-        guard let connection = videoConnection else { return }
+    private func sendVideoHeader(completion: @escaping (Bool) -> Void) {
+        guard let connection = videoConnection else {
+            completion(false)
+            return
+        }
         let header = KoveProtocol.makeVideoSizeHeader(width: width, height: height, clientName: "android")
         
-        connection.send(content: header, completion: .contentProcessed({ error in
+        connection.send(content: header, completion: .contentProcessed({ [weak self] error in
+            guard let self = self else { return }
             if let error = error {
-                Logger.shared.error("Failed to send VideoSize header: \(error.localizedDescription)")
+                Logger.shared.error("Failed to send Video Header: \(error.localizedDescription)")
+                completion(false)
             } else {
-                Logger.shared.success("📤 VideoSize header sent (\(header.count) bytes) [\(self.width)x\(self.height)]")
+                Logger.shared.info("📤 VideoSize header sent (69 bytes) -> W:\(self.width), H:\(self.height)")
+                completion(true)
             }
         }))
     }

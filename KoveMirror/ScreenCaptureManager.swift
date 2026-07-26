@@ -22,6 +22,7 @@ public final class ScreenCaptureManager: ObservableObject {
     // Broadcast Extension IPC Server
     private var ipcListener: NWListener?
     private var ipcConnection: NWConnection?
+    private var lastFrameTime: TimeInterval = 0
     private let ipcPort: UInt16 = 19890
     
     // Pixel Transfer Session for scaling
@@ -254,6 +255,12 @@ public final class ScreenCaptureManager: ObservableObject {
             }
             
             if sampleBufferType == .video, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+                let currentTime = CACurrentMediaTime()
+                if currentTime - self.lastFrameTime < 1.0 / 30.0 {
+                    return // Throttle to 30 fps max
+                }
+                self.lastFrameTime = currentTime
+                
                 let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
                 if CVPixelBufferGetWidth(pixelBuffer) != self.width || CVPixelBufferGetHeight(pixelBuffer) != self.height {
                     if let resized = self.resizePixelBuffer(pixelBuffer) {
