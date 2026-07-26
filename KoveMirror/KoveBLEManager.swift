@@ -190,12 +190,21 @@ extension KoveBLEManager: CBCentralManagerDelegate {
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         isConnected = false
         Logger.shared.error("❌ Failed to connect to BLE peripheral: \(error?.localizedDescription ?? "Unknown error")")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.startScanning()
+        }
     }
     
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         isConnected = false
         stopHeartbeat()
         Logger.shared.warning("🔴 Disconnected from BLE peripheral: \(error?.localizedDescription ?? "Normal disconnect")")
+        if error != nil {
+            Logger.shared.info("🔄 Unexpected BLE disconnection. Re-initiating scan to self-heal...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.startScanning()
+            }
+        }
     }
 }
 

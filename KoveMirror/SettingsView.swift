@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var mirrorService: KoveMirrorService
     
-    @State private var selectedResolutionIndex = 0
+    @AppStorage("selectedResolutionIndex") private var selectedResolutionIndex = 0
     let resolutions: [(name: String, width: UInt16, height: UInt16)] = [
         ("480 × 800 (Default Kove 800X)", 480, 800),
         ("600 × 1024 (HD TFT Standard)", 600, 1024),
