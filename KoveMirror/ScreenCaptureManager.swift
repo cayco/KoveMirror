@@ -100,7 +100,7 @@ public final class ScreenCaptureManager: ObservableObject {
     
     private func readIPCFrameData(_ connection: NWConnection) {
         // Read 14-byte header: Magic(2) [0x4B, 0x4D] + Width(2) + Height(2) + BytesPerRow(4) + DataSize(4)
-        connection.receive(exactLength: 14) { [weak self] content, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 14, maximumLength: 14) { [weak self] content, _, isComplete, error in
             guard let self = self, let headerData = content, headerData.count == 14 else {
                 if !isComplete && error == nil {
                     self?.readIPCFrameData(connection)
@@ -119,7 +119,7 @@ public final class ScreenCaptureManager: ObservableObject {
             let bytesPerRow = Int(UInt32(bytes[6]) << 24 | UInt32(bytes[7]) << 16 | UInt32(bytes[8]) << 8 | UInt32(bytes[9]))
             let dataSize = Int(UInt32(bytes[10]) << 24 | UInt32(bytes[11]) << 16 | UInt32(bytes[12]) << 8 | UInt32(bytes[13]))
             
-            connection.receive(exactLength: dataSize) { [weak self] frameData, _, isComplete, error in
+            connection.receive(minimumIncompleteLength: dataSize, maximumLength: dataSize) { [weak self] frameData, _, isComplete, error in
                 guard let self = self, let data = frameData, data.count == dataSize else {
                     if !isComplete && error == nil {
                         self?.readIPCFrameData(connection)
