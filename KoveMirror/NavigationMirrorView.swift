@@ -6,7 +6,6 @@ struct NavigationMirrorView: View {
     @State private var currentSpeed: Int = 78
     @State private var heading: String = "NE"
     @State private var nextTurnDistance: Int = 450
-    @State private var showingPermissionAlert = false
     
     let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
     
@@ -35,13 +34,13 @@ struct NavigationMirrorView: View {
                         
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(mirrorService.screenCapture.isBroadcastIPCActive ? Color.cyan : (mirrorService.isMirroringActive ? Color.green : Color.orange))
+                                .fill(mirrorService.screenCapture.isBroadcastIPCActive ? Color.cyan : (mirrorService.screenCapture.isCapturing ? Color.green : Color.orange))
                                 .frame(width: 10, height: 10)
                             
-                            Text(mirrorService.screenCapture.isBroadcastIPCActive ? "SYSTEM BROADCAST" : (mirrorService.isMirroringActive ? "DEMO CANVAS" : "STANDBY"))
+                            Text(mirrorService.screenCapture.isBroadcastIPCActive ? "SYSTEM BROADCAST" : (mirrorService.screenCapture.isCapturing ? "IN-APP CAPTURE" : "STANDBY"))
                                 .font(.caption2)
                                 .fontWeight(.black)
-                                .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .cyan : (mirrorService.isMirroringActive ? .green : .orange))
+                                .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .cyan : (mirrorService.screenCapture.isCapturing ? .green : .orange))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -51,92 +50,87 @@ struct NavigationMirrorView: View {
                     .padding(.horizontal)
                     .padding(.top, 10)
                     
-                    // ReplayKit System Screen Broadcast Card
-                    VStack(alignment: .leading, spacing: 12) {
+                    // Controls Card
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Image(systemName: mirrorService.screenCapture.isBroadcastIPCActive ? "record.circle.fill" : "app.badge.checkmark")
+                            Image(systemName: "play.tv.fill")
                                 .font(.title2)
-                                .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .red : .cyan)
+                                .foregroundColor(.cyan)
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("SYSTEM SCREEN BROADCAST (MAPS/WAZE)")
+                                Text("SCREEN MIRRORING CONTROLS")
                                     .font(.caption)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                 
-                                Text(mirrorService.screenCapture.isBroadcastIPCActive ? "Active: Mirroring full iPhone screen to TFT!" : "Ready: Tap button below to prompt permissions")
+                                Text(mirrorService.screenCapture.isCapturing ? "Screen Capture is active" : "Select streaming method below")
                                     .font(.caption2)
-                                    .foregroundColor(mirrorService.screenCapture.isBroadcastIPCActive ? .green : .gray)
+                                    .foregroundColor(mirrorService.screenCapture.isCapturing ? .green : .gray)
                             }
                             Spacer()
                         }
                         
                         Divider().background(Color.white.opacity(0.1))
                         
-                        // Direct Permission & Extension Launcher Button
+                        // Mode A: Native In-App ReplayKit Capture (Prompts iOS Permission Directly)
                         Button(action: {
-                            triggerBroadcastPermissionPrompt()
+                            if mirrorService.screenCapture.isCapturing {
+                                mirrorService.screenCapture.stopCapture()
+                            } else {
+                                mirrorService.screenCapture.startInAppScreenCapture(width: Int(mirrorService.width), height: Int(mirrorService.height))
+                            }
                         }) {
                             HStack {
-                                Image(systemName: "record.circle")
+                                Image(systemName: mirrorService.screenCapture.isCapturing ? "stop.circle.fill" : "record.circle")
                                     .font(.title3)
-                                Text("REQUEST PERMISSION & LAUNCH BROADCAST")
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(mirrorService.screenCapture.isCapturing ? "STOP IN-APP CAPTURE" : "START IN-APP SCREEN CAPTURE")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                    
+                                    Text("Prompts native iOS permission dialog directly")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(mirrorService.screenCapture.isCapturing ? .white.opacity(0.8) : .black.opacity(0.7))
+                                }
+                                
                                 Spacer()
-                                Image(systemName: "chevron.right")
                             }
-                            .foregroundColor(.black)
+                            .foregroundColor(mirrorService.screenCapture.isCapturing ? .white : .black)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color.cyan)
+                            .background(mirrorService.screenCapture.isCapturing ? Color.red : Color.cyan)
                             .cornerRadius(14)
                         }
                         
-                        // Built-in System Broadcast Picker View
+                        // Mode B: System Broadcast Picker (Google Maps / Waze)
                         HStack {
-                            Text("QUICK SYSTEM BROADCAST PICKER:")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.gray)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("LAUNCH SYSTEM BROADCAST (MAPS/WAZE)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Text("Tap picker icon on right to open system broadcast menu")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                            }
+                            
                             Spacer()
+                            
                             SystemBroadcastPickerRepresentable()
-                                .frame(width: 44, height: 44)
+                                .frame(width: 50, height: 50)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(12)
                         }
-                        .padding(.top, 4)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("HOW TO MIRROR GOOGLE MAPS / WAZE TO TFT:")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.cyan)
-                                .padding(.top, 4)
-                            
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("1.")
-                                    .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Tap 'REQUEST PERMISSION & LAUNCH BROADCAST' above to grant iOS screen recording permission.")
-                                    .font(.caption2).foregroundColor(.gray)
-                            }
-                            
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("2.")
-                                    .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Select 'KoveMirror Broadcast' and tap 'Start Broadcast'.")
-                                    .font(.caption2).foregroundColor(.white)
-                            }
-                            
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("3.")
-                                    .font(.caption2).fontWeight(.bold).foregroundColor(.cyan)
-                                Text("Open Google Maps, Waze, Scenic, or OsmAnd — your map will project directly onto the motorcycle TFT dash!")
-                                    .font(.caption2).foregroundColor(.green)
-                            }
-                        }
+                        .padding(12)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(14)
                     }
                     .padding(16)
                     .background(Color(red: 0.12, green: 0.14, blue: 0.18))
                     .cornerRadius(18)
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(mirrorService.screenCapture.isBroadcastIPCActive ? Color.cyan : Color.white.opacity(0.1), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .padding(.horizontal)
                     
                     // Live TFT Output Preview Box
@@ -167,18 +161,18 @@ struct NavigationMirrorView: View {
                         
                         // Main Canvas Area
                         ZStack {
-                            if mirrorService.screenCapture.isBroadcastIPCActive {
+                            if mirrorService.screenCapture.isBroadcastIPCActive || mirrorService.screenCapture.isCapturing {
                                 VStack(spacing: 12) {
                                     Image(systemName: "tv.and.mediabox.fill")
                                         .font(.system(size: 48))
                                         .foregroundColor(.cyan)
                                     
-                                    Text("LIVE SYSTEM SCREEN BROADCAST ACTIVE")
+                                    Text(mirrorService.screenCapture.isBroadcastIPCActive ? "LIVE SYSTEM BROADCAST ACTIVE" : "IN-APP SCREEN CAPTURE ACTIVE")
                                         .font(.caption)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                     
-                                    Text("Your full iPhone display (Google Maps / Waze) is currently streaming to the motorcycle TFT display.")
+                                    Text("Screen frames are encoding and streaming over TCP to the motorcycle TFT display.")
                                         .font(.caption2)
                                         .multilineTextAlignment(.center)
                                         .foregroundColor(.gray)
@@ -269,29 +263,11 @@ struct NavigationMirrorView: View {
             if nextTurnDistance <= 50 { nextTurnDistance = 500 }
         }
     }
-    
-    private func triggerBroadcastPermissionPrompt() {
-        RPBroadcastActivityViewController.load(withPreferredExtension: nil) { activityViewController, error in
-            if let error = error {
-                Logger.shared.error("Broadcast permission prompt error: \(error.localizedDescription)")
-                return
-            }
-            
-            if let activityVC = activityViewController {
-                DispatchQueue.main.async {
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let rootVC = windowScene.windows.first?.rootViewController {
-                        rootVC.present(activityVC, animated: true)
-                    }
-                }
-            }
-        }
-    }
 }
 
 struct SystemBroadcastPickerRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
-        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
+        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 50, height: 50))
         picker.preferredExtension = "com.kove.mirror.ios.broadcast"
         picker.showsMicrophoneButton = false
         return picker
