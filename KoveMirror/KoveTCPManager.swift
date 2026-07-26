@@ -222,15 +222,18 @@ public final class KoveTCPManager: ObservableObject {
             guard let self = self else { return }
             switch state {
             case .ready:
-                self.isVideoConnected = true
-                self.startVideoHeartbeat()
                 self.readVideoFeedback(connection)
                 
                 // CRITICAL: Send header and wait for it to be processed BEFORE starting video data.
                 // Prevents TCP coalescing which breaks poorly written embedded recv() loops.
                 self.sendVideoHeader { success in
                     if success {
-                        self.onVideoConnected?()
+                        // Add a tiny physical delay to ensure the TFT parses the header before NAL units arrive
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.isVideoConnected = true
+                            self.startVideoHeartbeat()
+                            self.onVideoConnected?()
+                        }
                     }
                 }
             case .failed(let err):
