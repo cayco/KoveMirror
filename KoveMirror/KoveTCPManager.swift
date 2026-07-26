@@ -16,8 +16,8 @@ public final class KoveTCPManager: ObservableObject {
     private var videoConnection: NWConnection?
     private var heartbeatConnection: NWConnection?
     
-    private var videoHeartbeatTimer: Timer?
-    private var dedicatedHeartbeatTimer: Timer?
+    private var videoHeartbeatTimer: DispatchSourceTimer?
+    private var dedicatedHeartbeatTimer: DispatchSourceTimer?
     
     private var isHandshakeCompleted = false
     public var width: UInt16 = 480
@@ -44,6 +44,11 @@ public final class KoveTCPManager: ObservableObject {
         stopDedicatedHeartbeat()
         
         controlConnection?.cancel()
+        
+        videoHeartbeatTimer?.cancel()
+        dedicatedHeartbeatTimer?.cancel()
+        videoHeartbeatTimer = nil
+        dedicatedHeartbeatTimer = nil
         videoConnection?.cancel()
         heartbeatConnection?.cancel()
         
@@ -261,16 +266,21 @@ public final class KoveTCPManager: ObservableObject {
     }
     
     private func startVideoHeartbeat() {
-        stopVideoHeartbeat()
-        videoHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        videoHeartbeatTimer?.cancel()
+        
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
+        timer.setEventHandler { [weak self] in
             guard let self = self, let connection = self.videoConnection, self.isVideoConnected else { return }
             let packet = Data(KoveProtocol.heartbeatPacket)
             connection.send(content: packet, completion: .idempotent)
         }
+        timer.resume()
+        videoHeartbeatTimer = timer
     }
     
     private func stopVideoHeartbeat() {
-        videoHeartbeatTimer?.invalidate()
+        videoHeartbeatTimer?.cancel()
         videoHeartbeatTimer = nil
     }
     
@@ -338,7 +348,7 @@ public final class KoveTCPManager: ObservableObject {
             case .ready:
                 self?.isHeartbeatConnected = true
                 Logger.shared.success("🔌 TFT Dedicated Heartbeat socket connected! Starting 200ms ping...")
-                self?.startDedicatedHeartbeat()
+                self?.startDedicatedHeartbeatPing()
             case .failed, .cancelled:
                 self?.isHeartbeatConnected = false
                 self?.stopDedicatedHeartbeat()
@@ -350,17 +360,22 @@ public final class KoveTCPManager: ObservableObject {
         connection.start(queue: .main)
     }
     
-    private func startDedicatedHeartbeat() {
-        stopDedicatedHeartbeat()
-        dedicatedHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+    private func startDedicatedHeartbeatPing() {
+        dedicatedHeartbeatTimer?.cancel()
+        
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 0.2, repeating: 0.2)
+        timer.setEventHandler { [weak self] in
             guard let self = self, let connection = self.heartbeatConnection, self.isHeartbeatConnected else { return }
             let packet = Data(KoveProtocol.heartbeatPacket)
             connection.send(content: packet, completion: .idempotent)
         }
+        timer.resume()
+        dedicatedHeartbeatTimer = timer
     }
     
     private func stopDedicatedHeartbeat() {
-        dedicatedHeartbeatTimer?.invalidate()
+        dedicatedHeartbeatTimer?.cancel()
         dedicatedHeartbeatTimer = nil
     }
 }

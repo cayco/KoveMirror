@@ -288,8 +288,17 @@ public final class H264Encoder: ObservableObject {
                 memcpy(&nalUnitLength, dataPointer.advanced(by: bufferOffset), avccHeaderLength)
                 nalUnitLength = UInt32(bigEndian: nalUnitLength)
                 
-                packetData.append(annexBHeader)
-                packetData.append(UnsafePointer<UInt8>(OpaquePointer(dataPointer.advanced(by: bufferOffset + avccHeaderLength))), count: Int(nalUnitLength))
+                let payloadPointer = dataPointer.advanced(by: bufferOffset + avccHeaderLength)
+                let nalUnitType = payloadPointer.pointee & 0x1F
+                
+                // CRITICAL: Strip SEI (Supplemental Enhancement Information) NAL units (Type 6)
+                // Embedded hardware decoders (like Kove TFT) often crash if they encounter unexpected NAL unit types.
+                if nalUnitType != 6 {
+                    packetData.append(annexBHeader)
+                    packetData.append(UnsafePointer<UInt8>(OpaquePointer(payloadPointer)), count: Int(nalUnitLength))
+                } else {
+                    Logger.shared.info("Stripped SEI NAL unit from stream to protect hardware decoder")
+                }
                 
                 bufferOffset += Int(nalUnitLength) + avccHeaderLength
             }

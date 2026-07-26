@@ -149,7 +149,7 @@ public enum KoveProtocol {
         
         // 3. Command 18 (262 bytes: 6 bytes header + 256 bytes email string padded with 0x00)
         data.append(contentsOf: [0x01, 0x12, 0x00, 0x00, 0x01, 0x00])
-        var emailBytes = Array("apple@iphone.com".utf8)
+        var emailBytes = Array("yahoo@yahoo.com".utf8)
         if emailBytes.count < 256 {
             emailBytes.append(contentsOf: Array(repeating: UInt8(0), count: 256 - emailBytes.count))
         } else {
@@ -180,18 +180,11 @@ public enum KoveProtocol {
         // CRITICAL FIX: Byte 0 is 0x00. Client name ("android") starts at index 1
         header.replaceSubrange(1..<(1 + copyLen), with: nameBytes[0..<copyLen])
         
-        let bigWidth = width.bigEndian
-        let bigHeight = height.bigEndian
+        header[65] = UInt8((width >> 8) & 0xFF)
+        header[66] = UInt8(width & 0xFF)
         
-        withUnsafeBytes(of: bigWidth) { buf in
-            header[65] = buf[0]
-            header[66] = buf[1]
-        }
-        
-        withUnsafeBytes(of: bigHeight) { buf in
-            header[67] = buf[0]
-            header[68] = buf[1]
-        }
+        header[67] = UInt8((height >> 8) & 0xFF)
+        header[68] = UInt8(height & 0xFF)
         
         return header
     }
