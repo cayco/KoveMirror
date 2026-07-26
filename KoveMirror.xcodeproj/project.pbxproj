@@ -20,12 +20,12 @@
 		A011 /* KoveMirrorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011 /* KoveMirrorService.swift */; };
 		A012 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012 /* Logger.swift */; };
 		A013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F014 /* Assets.xcassets */; };
-		A014 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F015 /* SampleHandler.swift */; };
+		A014 /* BroadcastExtension/SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F015 /* BroadcastExtension/SampleHandler.swift */; };
 		A015 /* KoveMirrorBroadcast.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = P002 /* KoveMirrorBroadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		PROXY01 = {
+		PROXY01 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = PR01 /* Project object */;
 			proxyType = 1;
@@ -63,8 +63,8 @@
 		F012 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		F013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F014 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		F015 /* SampleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastExtension/SampleHandler.swift; sourceTree = "<group>"; };
-		F016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BroadcastExtension/Info.plist; sourceTree = "<group>"; };
+		F015 /* BroadcastExtension/SampleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastExtension/SampleHandler.swift; sourceTree = "<group>"; };
+		F016 /* BroadcastExtension/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BroadcastExtension/Info.plist; sourceTree = "<group>"; };
 		P001 /* KoveMirror.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KoveMirror.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		P002 /* KoveMirrorBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KoveMirrorBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -113,8 +113,8 @@
 				F012 /* Logger.swift */,
 				F013 /* Info.plist */,
 				F014 /* Assets.xcassets */,
-				F015 /* SampleHandler.swift */,
-				F016 /* Info.plist */,
+				F015 /* BroadcastExtension/SampleHandler.swift */,
+				F016 /* BroadcastExtension/Info.plist */,
 			);
 			path = KoveMirror;
 			sourceTree = "<group>";
@@ -194,6 +194,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		R001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A013 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		S001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -218,25 +229,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A014 /* SampleHandler.swift in Sources */,
+				A014 /* BroadcastExtension/SampleHandler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXResourcesBuildPhase section */
-		R001 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A013 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXTargetDependency section */
-		DEP01 = {
+		DEP01 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = T002 /* KoveMirrorBroadcast */;
 			targetProxy = PROXY01 /* PBXContainerItemProxy */;
@@ -253,6 +253,7 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = KoveMirror/KoveMirror.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = L4QQBV468L;
@@ -282,6 +283,7 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = KoveMirror/KoveMirror.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = L4QQBV468L;
@@ -406,8 +408,10 @@
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = KoveMirror/BroadcastExtension/KoveMirrorBroadcast.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L4QQBV468L;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -428,8 +432,10 @@
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = KoveMirror/BroadcastExtension/KoveMirrorBroadcast.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L4QQBV468L;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;

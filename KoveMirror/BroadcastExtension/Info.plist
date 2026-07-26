@@ -25,7 +25,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<key>com.apple.replaykit-broadcast-upload-extension</key>
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).SampleHandler</string>
+		<string>SampleHandler</string>
 		<key>RPBroadcastProcessMode</key>
 		<string>RPBroadcastProcessModeSampleBuffer</string>
 	</dict>
