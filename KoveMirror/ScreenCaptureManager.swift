@@ -156,29 +156,39 @@ public final class ScreenCaptureManager: ObservableObject {
     }
     
     private func processRawFrameBytes(_ data: Data, width: Int, height: Int, bytesPerRow: Int) {
+        if pixelBufferPool == nil {
+            setupBufferPool()
+        }
+        
         var pixelBuffer: CVPixelBuffer?
-        let attrs = [
-            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
-            kCVPixelBufferIOSurfacePropertiesKey: [:]
-        ] as CFDictionary
+        if let pool = pixelBufferPool {
+            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
+        }
         
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            width,
-            height,
-            kCVPixelFormatType_32BGRA,
-            attrs,
-            &pixelBuffer
-        )
+        if pixelBuffer == nil {
+            let attrs = [
+                kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+                kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
+                kCVPixelBufferIOSurfacePropertiesKey: [:]
+            ] as CFDictionary
+            
+            CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                width,
+                height,
+                kCVPixelFormatType_32BGRA,
+                attrs,
+                &pixelBuffer
+            )
+        }
         
-        guard status == kCVReturnSuccess, let buffer = pixelBuffer else { return }
+        guard let buffer = pixelBuffer else { return }
         
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
         
         if let baseAddress = CVPixelBufferGetBaseAddress(buffer) {
-            data.copyBytes(to: baseAddress.assumingMemoryBound(to: UInt8.self), count: data.count)
+            data.copyBytes(to: baseAddress.assumingMemoryBound(to: UInt8.self), count: min(data.count, CVPixelBufferGetDataSize(buffer)))
             let pts = CMTime(value: Int64(CACurrentMediaTime() * 1_000_000_000), timescale: 1_000_000_000)
             onPixelBufferCaptured?(buffer, pts)
         }
