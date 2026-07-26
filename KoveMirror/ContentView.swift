@@ -50,8 +50,6 @@ struct ContentView: View {
 
 struct MainDashboardView: View {
     @ObservedObject var mirrorService: KoveMirrorService
-    @State private var isStealthModeActive = false
-    @State private var previousBrightness: CGFloat = 0.5
     @ObservedObject var stealthManager: PocketStealthManager
     
     var body: some View {
@@ -113,46 +111,6 @@ struct MainDashboardView: View {
                         .cornerRadius(24)
                         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
 
-                        
-                        // Pocket Stealth Mode Control Card
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "moon.stars.fill")
-                                            .foregroundColor(.cyan)
-                                        Text("POCKET STEALTH MODE")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.cyan)
-                                    }
-                                    Text("OLED pitch black, 0% display power, 2s lock")
-                                        .font(.caption2)
-                                        .foregroundColor(.gray)
-                                }
-                                Spacer()
-                                Toggle("", isOn: $isStealthModeActive)
-                                    .labelsHidden()
-                                    .toggleStyle(SwitchToggleStyle(tint: .cyan))
-                                    .onChange(of: isStealthModeActive) { active in
-                                        #if canImport(UIKit)
-                                        if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                                            if active {
-                                                previousBrightness = scene.screen.brightness
-                                                scene.screen.brightness = 0.0
-                                            } else {
-                                                scene.screen.brightness = max(0.5, previousBrightness)
-                                            }
-                                        }
-                                        #endif
-                                    }
-                            }
-                        }
-                        .padding(16)
-                        .background(Color(red: 0.12, green: 0.14, blue: 0.18))
-                        .cornerRadius(18)
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                        
                         // Pocket Stealth Mode Card
                         VStack(spacing: 12) {
                             HStack {
@@ -279,52 +237,6 @@ struct MainDashboardView: View {
                         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.orange.opacity(0.3), lineWidth: 1))
                     }
                     .padding()
-                }
-                
-                // Full Screen Tap-to-Wake Stealth Overlay
-                if isStealthModeActive {
-                    Color.black
-                        .ignoresSafeArea()
-                        .overlay(
-                            VStack(spacing: 12) {
-                                Image(systemName: "moon.fill")
-                                    .font(.system(size: 44))
-                                    .foregroundColor(.cyan.opacity(0.3))
-                                
-                                Text("POCKET STEALTH MODE ACTIVE")
-                                    .font(.caption)
-                                    .fontWeight(.black)
-                                    .foregroundColor(.white.opacity(0.4))
-                                
-                                Text("Double-tap screen when out of pocket to wake")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray.opacity(0.6))
-                            }
-                        )
-                        .onTapGesture(count: 2) {
-                            #if canImport(UIKit)
-                            // Ignore touches if proximity sensor is covered inside pocket/bag
-                            guard !UIDevice.current.proximityState else { return }
-                            #endif
-                            isStealthModeActive = false
-                        }
-                        .onAppear {
-                            #if canImport(UIKit)
-                            UIDevice.current.isProximityMonitoringEnabled = true
-                            if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                                previousBrightness = scene.screen.brightness
-                                scene.screen.brightness = 0.0
-                            }
-                            #endif
-                        }
-                        .onDisappear {
-                            #if canImport(UIKit)
-                            UIDevice.current.isProximityMonitoringEnabled = false
-                            if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                                scene.screen.brightness = max(0.5, previousBrightness)
-                            }
-                            #endif
-                        }
                 }
             }
             .navigationTitle("KoveMirror")
@@ -570,7 +482,7 @@ public struct PocketStealthOverlayView: View {
                         .font(.system(size: 14, weight: .black))
                         .foregroundColor(.white.opacity(0.6))
                     
-                    Text(isHolding ? "Keep holding to unlock..." : "Press and hold screen for 2s to unlock")
+                    Text("Double-tap screen to unlock")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.gray.opacity(0.7))
                 }
@@ -578,10 +490,8 @@ public struct PocketStealthOverlayView: View {
         }
         .statusBar(hidden: stealthManager.isStealthActive)
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 2.0, perform: {
+        .onTapGesture(count: 2) {
             stealthManager.exitStealth()
-        }, onPressingChanged: { pressing in
-            isHolding = pressing
-        })
+        }
     }
 }
