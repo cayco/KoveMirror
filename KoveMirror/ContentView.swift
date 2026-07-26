@@ -1,4 +1,5 @@
 import SwiftUI
+import ReplayKit
 
 struct ContentView: View {
     @StateObject private var mirrorService = KoveMirrorService()
@@ -102,6 +103,72 @@ struct MainDashboardView: View {
                         .cornerRadius(24)
                         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
                         
+                        // Full System Screen Casting Card (Google Maps, Waze, Scenic, OsmAnd)
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "tv.badge.wifi.fill")
+                                            .foregroundColor(.green)
+                                        Text("FULL SYSTEM SCREEN CASTING")
+                                            .font(.caption)
+                                            .fontWeight(.black)
+                                            .foregroundColor(.green)
+                                    }
+                                    
+                                    Text("Cast Google Maps, Waze, OsmAnd to TFT")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Spacer()
+                                
+                                StatusBadge(
+                                    isActive: mirrorService.screenCapture.isBroadcastIPCActive,
+                                    activeTitle: "BROADCAST LIVE",
+                                    inactiveTitle: "READY"
+                                )
+                            }
+                            
+                            Text("Tap the broadcast button on the right to start system screen recording. Your entire iPhone screen will be mirrored to the motorcycle display.")
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                                .lineLimit(2)
+                            
+                            Divider().background(Color.white.opacity(0.1))
+                            
+                            HStack(spacing: 12) {
+                                Image(systemName: "hand.tap.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.cyan)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("TAP TO START SYSTEM BROADCAST")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Select 'KoveMirror Broadcast' in system prompt")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.cyan)
+                                }
+                                
+                                Spacer()
+                                
+                                MainDashboardBroadcastPickerRepresentable()
+                                    .frame(width: 54, height: 54)
+                                    .background(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green.opacity(0.2) : Color.cyan.opacity(0.2))
+                                    .cornerRadius(14)
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green : Color.cyan, lineWidth: 1.5))
+                            }
+                        }
+                        .padding(18)
+                        .background(Color(red: 0.10, green: 0.14, blue: 0.16))
+                        .cornerRadius(22)
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(mirrorService.screenCapture.isBroadcastIPCActive ? Color.green.opacity(0.5) : Color.cyan.opacity(0.3), lineWidth: 1.5))
+
+                        
                         // Pocket Stealth Mode Control Card
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
@@ -124,11 +191,13 @@ struct MainDashboardView: View {
                                     .toggleStyle(SwitchToggleStyle(tint: .cyan))
                                     .onChange(of: isStealthModeActive) { active in
                                         #if canImport(UIKit)
-                                        if active {
-                                            previousBrightness = UIScreen.main.brightness
-                                            UIScreen.main.brightness = 0.0
-                                        } else {
-                                            UIScreen.main.brightness = max(0.5, previousBrightness)
+                                        if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                                            if active {
+                                                previousBrightness = scene.screen.brightness
+                                                scene.screen.brightness = 0.0
+                                            } else {
+                                                scene.screen.brightness = max(0.5, previousBrightness)
+                                            }
                                         }
                                         #endif
                                     }
@@ -268,14 +337,18 @@ struct MainDashboardView: View {
                         .onAppear {
                             #if canImport(UIKit)
                             UIDevice.current.isProximityMonitoringEnabled = true
-                            previousBrightness = UIScreen.main.brightness
-                            UIScreen.main.brightness = 0.0
+                            if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                                previousBrightness = scene.screen.brightness
+                                scene.screen.brightness = 0.0
+                            }
                             #endif
                         }
                         .onDisappear {
                             #if canImport(UIKit)
                             UIDevice.current.isProximityMonitoringEnabled = false
-                            UIScreen.main.brightness = max(0.5, previousBrightness)
+                            if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                                scene.screen.brightness = max(0.5, previousBrightness)
+                            }
                             #endif
                         }
                 }
@@ -359,5 +432,38 @@ struct InstructionStep: View {
             
             Spacer()
         }
+    }
+}
+
+struct MainDashboardBroadcastPickerRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
+        let picker = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 54, height: 54))
+        picker.preferredExtension = "pl.cayco.kovemirror.broadcast"
+        picker.showsMicrophoneButton = false
+        return picker
+    }
+    
+    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {}
+}
+
+struct StatusBadge: View {
+    let isActive: Bool
+    let activeTitle: String
+    let inactiveTitle: String
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(isActive ? Color.green : Color.orange)
+                .frame(width: 8, height: 8)
+            
+            Text(isActive ? activeTitle : inactiveTitle)
+                .font(.system(size: 9, weight: .black))
+                .foregroundColor(isActive ? .green : .orange)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(isActive ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+        .cornerRadius(8)
     }
 }

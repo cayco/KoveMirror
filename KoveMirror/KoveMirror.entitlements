@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.kove.mirror.ios</string>
+		<string>group.pl.cayco.kovemirror</string>
 	</array>
 </dict>
 </plist>

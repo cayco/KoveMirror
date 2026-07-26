@@ -25,6 +25,10 @@ public final class H264Encoder: ObservableObject {
         self.bitrate = bitrate
     }
     
+    deinit {
+        stopSession()
+    }
+    
     // MARK: - Compression Session Initialization
     
     public func startSession(width: Int32? = nil, height: Int32? = nil) {
@@ -118,12 +122,10 @@ public final class H264Encoder: ObservableObject {
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
         
         var isKeyFrame = true
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false), CFArrayGetCount(attachments) > 0 {
-            let dict = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0), to: CFDictionary.self)
-            if let notSyncVal = CFDictionaryGetValue(dict, Unmanaged.passUnretained(kCMSampleAttachmentKey_NotSync).toOpaque()) {
-                let notSync = unsafeBitCast(notSyncVal, to: CFBoolean.self)
-                isKeyFrame = !CFBooleanGetValue(notSync)
-            }
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[CFString: Any]],
+           let firstAttachment = attachments.first,
+           let notSync = firstAttachment[kCMSampleAttachmentKey_NotSync] as? Bool {
+            isKeyFrame = !notSync
         }
         
         var packetData = Data()

@@ -21,6 +21,11 @@ public final class KoveMirrorService: ObservableObject {
         self.encoder = H264Encoder(width: 480, height: 800)
         self.screenCapture = ScreenCaptureManager()
         
+        bleManager.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        tcpManager.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        encoder.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        screenCapture.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+
         setupPipeline()
     }
     
@@ -39,7 +44,13 @@ public final class KoveMirrorService: ObservableObject {
             guard let self = self else { return }
             Logger.shared.success("🎬 TFT Video Socket connected. Starting H.264 VideoToolbox Session...")
             self.encoder.startSession(width: Int32(self.width), height: Int32(self.height))
-            self.screenCapture.startSyntheticCanvasCapture(width: Int(self.width), height: Int(self.height))
+            
+            if self.screenCapture.isBroadcastIPCActive {
+                Logger.shared.success("📡 System Screen Broadcast is ACTIVE. Forwarding full system screen (Maps/Waze) to TFT!")
+            } else {
+                Logger.shared.info("ℹ️ System Screen Broadcast standby. Starting Navigation Canvas fallback until System Broadcast is launched...")
+                self.screenCapture.startSyntheticCanvasCapture(width: Int(self.width), height: Int(self.height))
+            }
             
             DispatchQueue.main.async {
                 self.isMirroringActive = true

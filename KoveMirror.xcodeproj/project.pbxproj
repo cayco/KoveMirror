@@ -256,7 +256,7 @@
 				CODE_SIGN_ENTITLEMENTS = KoveMirror/KoveMirror.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L4QQBV468L;
+				DEVELOPMENT_TEAM = VHJK7GS6R7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -265,7 +265,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kove.mirror.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -286,7 +286,7 @@
 				CODE_SIGN_ENTITLEMENTS = KoveMirror/KoveMirror.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L4QQBV468L;
+				DEVELOPMENT_TEAM = VHJK7GS6R7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -295,7 +295,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kove.mirror.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -416,7 +416,7 @@
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kove.mirror.ios.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.broadcast;
 				PRODUCT_MODULE_NAME = KoveMirrorBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -441,7 +441,7 @@
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kove.mirror.ios.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = pl.cayco.kovemirror.broadcast;
 				PRODUCT_MODULE_NAME = KoveMirrorBroadcast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

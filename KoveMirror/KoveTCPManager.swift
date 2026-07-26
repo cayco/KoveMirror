@@ -47,31 +47,22 @@ public final class KoveTCPManager: ObservableObject {
         videoConnection?.cancel()
         heartbeatConnection?.cancel()
         
-        controlListener?.cancel()
-        videoListener?.cancel()
-        heartbeatListener?.cancel()
-        
         controlConnection = nil
         videoConnection = nil
         heartbeatConnection = nil
-        
-        controlListener = nil
-        videoListener = nil
-        heartbeatListener = nil
         
         isControlConnected = false
         isVideoConnected = false
         isHeartbeatConnected = false
         isHandshakeCompleted = false
         
-        Logger.shared.info("🔌 All TCP servers closed")
+        Logger.shared.info("🔌 Active TCP connections closed. Servers remain listening for next session.")
     }
     
     // MARK: - Port 17818 (Control Server)
     
     private func startControlServer() {
-        controlListener?.cancel()
-        controlListener = nil
+        guard controlListener == nil else { return }
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true
@@ -189,8 +180,7 @@ public final class KoveTCPManager: ObservableObject {
     // MARK: - Port 15456 (Video Server)
     
     private func startVideoServer() {
-        videoListener?.cancel()
-        videoListener = nil
+        guard videoListener == nil else { return }
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true
@@ -310,8 +300,7 @@ public final class KoveTCPManager: ObservableObject {
     // MARK: - Port 15457 (Dedicated Heartbeat Server)
     
     private func startHeartbeatServer() {
-        heartbeatListener?.cancel()
-        heartbeatListener = nil
+        guard heartbeatListener == nil else { return }
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true

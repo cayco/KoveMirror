@@ -3,6 +3,7 @@ import ReplayKit
 import CoreVideo
 import CoreMedia
 import Network
+import VideoToolbox
 
 #if canImport(UIKit)
 import UIKit
@@ -22,6 +23,9 @@ public final class ScreenCaptureManager: ObservableObject {
     private var ipcListener: NWListener?
     private var ipcConnection: NWConnection?
     private let ipcPort: UInt16 = 19890
+    
+    // Pixel Transfer Session for scaling
+    private var transferSession: VTPixelTransferSession?
     
     public init() {
         startBroadcastIPCListener()
@@ -81,6 +85,8 @@ public final class ScreenCaptureManager: ObservableObject {
             switch state {
             case .ready:
                 DispatchQueue.main.async {
+                    self?.renderTimer?.invalidate()
+                    self?.renderTimer = nil
                     self?.isBroadcastIPCActive = true
                     self?.isCapturing = true
                 }
@@ -119,7 +125,7 @@ public final class ScreenCaptureManager: ObservableObject {
             let bytesPerRow = Int(UInt32(bytes[6]) << 24 | UInt32(bytes[7]) << 16 | UInt32(bytes[8]) << 8 | UInt32(bytes[9]))
             let dataSize = Int(UInt32(bytes[10]) << 24 | UInt32(bytes[11]) << 16 | UInt32(bytes[12]) << 8 | UInt32(bytes[13]))
             
-            self.readIPCPayload(connection: connection, remainingBytes: dataSize, accumulated: Data()) { [weak self] frameData in
+            self.readIPCPayload(connection: connection, remainingBytes: dataSize) { [weak self] frameData in
                 if let data = frameData {
                     self?.processRawFrameBytes(data, width: frameWidth, height: frameHeight, bytesPerRow: bytesPerRow)
                 }
@@ -128,69 +134,87 @@ public final class ScreenCaptureManager: ObservableObject {
         }
     }
     
-    private func readIPCPayload(connection: NWConnection, remainingBytes: Int, accumulated: Data, completion: @escaping (Data?) -> Void) {
+    private func readIPCPayload(connection: NWConnection, remainingBytes: Int, completion: @escaping (Data?) -> Void) {
         if remainingBytes <= 0 {
-            completion(accumulated)
+            completion(Data())
             return
         }
         
-        let chunkSize = min(remainingBytes, 65536)
-        connection.receive(minimumIncompleteLength: 1, maximumLength: chunkSize) { [weak self] content, _, isComplete, error in
-            guard let data = content, !data.isEmpty else {
-                completion(nil)
-                return
-            }
-            
-            var nextAccumulated = accumulated
-            nextAccumulated.append(data)
-            let nextRemaining = remainingBytes - data.count
-            
-            if nextRemaining <= 0 {
-                completion(nextAccumulated)
-            } else if !isComplete && error == nil {
-                self?.readIPCPayload(connection: connection, remainingBytes: nextRemaining, accumulated: nextAccumulated, completion: completion)
+        connection.receive(minimumIncompleteLength: remainingBytes, maximumLength: remainingBytes) { content, _, _, error in
+            if let data = content, data.count == remainingBytes, error == nil {
+                completion(data)
             } else {
                 completion(nil)
             }
         }
     }
     
-    private func processRawFrameBytes(_ data: Data, width: Int, height: Int, bytesPerRow: Int) {
+    private func resizePixelBuffer(_ sourceBuffer: CVPixelBuffer) -> CVPixelBuffer? {
+        if transferSession == nil {
+            VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault, pixelTransferSessionOut: &transferSession)
+        }
+        
         if pixelBufferPool == nil {
             setupBufferPool()
         }
-        
-        var pixelBuffer: CVPixelBuffer?
+        var destBuffer: CVPixelBuffer?
         if let pool = pixelBufferPool {
-            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
+            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &destBuffer)
         }
+        guard let dest = destBuffer, let session = transferSession else { return nil }
         
-        if pixelBuffer == nil {
-            let attrs = [
-                kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
-                kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
-                kCVPixelBufferIOSurfacePropertiesKey: [:]
-            ] as CFDictionary
-            
-            CVPixelBufferCreate(
-                kCFAllocatorDefault,
-                width,
-                height,
-                kCVPixelFormatType_32BGRA,
-                attrs,
-                &pixelBuffer
-            )
-        }
+        let status = VTPixelTransferSessionTransferImage(session, from: sourceBuffer, to: dest)
+        return status == noErr ? dest : nil
+    }
+
+    private func processRawFrameBytes(_ data: Data, width: Int, height: Int, bytesPerRow: Int) {
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: true as CFBoolean,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: true as CFBoolean,
+            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary
+        ] as CFDictionary
+        
+        CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attrs,
+            &pixelBuffer
+        )
         
         guard let buffer = pixelBuffer else { return }
         
         CVPixelBufferLockBaseAddress(buffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
         
         if let baseAddress = CVPixelBufferGetBaseAddress(buffer) {
-            data.copyBytes(to: baseAddress.assumingMemoryBound(to: UInt8.self), count: min(data.count, CVPixelBufferGetDataSize(buffer)))
+            let dstBytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+            if bytesPerRow == dstBytesPerRow {
+                data.copyBytes(to: baseAddress.assumingMemoryBound(to: UInt8.self), count: min(data.count, CVPixelBufferGetDataSize(buffer)))
+            } else {
+                data.withUnsafeBytes { rawBuffer in
+                    guard let srcAddress = rawBuffer.baseAddress else { return }
+                    for row in 0..<height {
+                        let srcRow = srcAddress.advanced(by: row * bytesPerRow)
+                        let dstRow = baseAddress.advanced(by: row * dstBytesPerRow)
+                        memcpy(dstRow, srcRow, min(bytesPerRow, dstBytesPerRow))
+                    }
+                }
+            }
+            CVPixelBufferUnlockBaseAddress(buffer, [])
+            
             let pts = CMTime(value: Int64(CACurrentMediaTime() * 1_000_000_000), timescale: 1_000_000_000)
-            onPixelBufferCaptured?(buffer, pts)
+            
+            if CVPixelBufferGetWidth(buffer) != self.width || CVPixelBufferGetHeight(buffer) != self.height {
+                if let resized = resizePixelBuffer(buffer) {
+                    onPixelBufferCaptured?(resized, pts)
+                }
+            } else {
+                onPixelBufferCaptured?(buffer, pts)
+            }
+        } else {
+            CVPixelBufferUnlockBaseAddress(buffer, [])
         }
     }
     
@@ -222,7 +246,13 @@ public final class ScreenCaptureManager: ObservableObject {
             
             if sampleBufferType == .video, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
                 let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                self.onPixelBufferCaptured?(pixelBuffer, pts)
+                if CVPixelBufferGetWidth(pixelBuffer) != self.width || CVPixelBufferGetHeight(pixelBuffer) != self.height {
+                    if let resized = self.resizePixelBuffer(pixelBuffer) {
+                        self.onPixelBufferCaptured?(resized, pts)
+                    }
+                } else {
+                    self.onPixelBufferCaptured?(pixelBuffer, pts)
+                }
             }
         }, completionHandler: { [weak self] error in
             if let error = error {

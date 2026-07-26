@@ -12,6 +12,7 @@ public class SampleHandler: RPBroadcastSampleHandler {
 
     private var connection: NWConnection?
     private var isConnected = false
+    private var isSending = false
     private let ipcPort: UInt16 = 19890
     private let sendQueue = DispatchQueue(label: "com.kovemirror.broadcast.send", qos: .userInteractive)
     
@@ -20,6 +21,7 @@ public class SampleHandler: RPBroadcastSampleHandler {
     private var scaledBufferPool: CVPixelBufferPool?
     private let targetWidth = 480
     private let targetHeight = 800
+    private var reconnectTimer: DispatchSourceTimer?
 
     override public func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         super.broadcastStarted(withSetupInfo: setupInfo)
@@ -37,6 +39,7 @@ public class SampleHandler: RPBroadcastSampleHandler {
 
     override public func broadcastFinished() {
         super.broadcastFinished()
+        stopReconnectTimer()
         connection?.cancel()
         connection = nil
         isConnected = false
@@ -84,6 +87,11 @@ public class SampleHandler: RPBroadcastSampleHandler {
     // MARK: - Local Loopback IPC Connection
 
     private func connectToHostApp() {
+        if connection != nil {
+            connection?.cancel()
+            connection = nil
+        }
+        
         let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: ipcPort)!)
         let params = NWParameters.tcp
         
@@ -92,8 +100,10 @@ public class SampleHandler: RPBroadcastSampleHandler {
             switch state {
             case .ready:
                 self?.isConnected = true
+                self?.stopReconnectTimer()
             case .failed, .cancelled:
                 self?.isConnected = false
+                self?.startReconnectTimer()
             default:
                 break
             }
@@ -101,9 +111,30 @@ public class SampleHandler: RPBroadcastSampleHandler {
         conn.start(queue: sendQueue)
         self.connection = conn
     }
+    
+    private func startReconnectTimer() {
+        guard reconnectTimer == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: sendQueue)
+        timer.schedule(deadline: .now() + 2.0, repeating: 2.0)
+        timer.setEventHandler { [weak self] in
+            self?.connectToHostApp()
+        }
+        timer.resume()
+        reconnectTimer = timer
+    }
+    
+    private func stopReconnectTimer() {
+        reconnectTimer?.cancel()
+        reconnectTimer = nil
+    }
 
     private func sendPixelBuffer(_ pixelBuffer: CVPixelBuffer) {
         guard isConnected, let connection = connection else { return }
+        
+        if isSending {
+            return
+        }
+        isSending = true
 
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
@@ -134,7 +165,9 @@ public class SampleHandler: RPBroadcastSampleHandler {
         packet.append(header)
         packet.append(frameData)
 
-        connection.send(content: packet, completion: .idempotent)
+        connection.send(content: packet, completion: .contentProcessed({ [weak self] _ in
+            self?.isSending = false
+        }))
     }
 }
 
