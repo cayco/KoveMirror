@@ -70,16 +70,8 @@ public final class KoveTCPManager: ObservableObject {
     // MARK: - Port 17818 (Control Server)
     
     private func startControlServer() {
-        if let listener = controlListener {
-            switch listener.state {
-            case .ready, .setup, .waiting:
-                Logger.shared.info("ℹ️ Control Server already active on PORT \(KoveProtocol.portControl)")
-                return
-            default:
-                listener.cancel()
-                controlListener = nil
-            }
-        }
+        controlListener?.cancel()
+        controlListener = nil
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true
@@ -197,16 +189,8 @@ public final class KoveTCPManager: ObservableObject {
     // MARK: - Port 15456 (Video Server)
     
     private func startVideoServer() {
-        if let listener = videoListener {
-            switch listener.state {
-            case .ready, .setup, .waiting:
-                Logger.shared.info("ℹ️ Video Server already active on PORT \(KoveProtocol.portVideo)")
-                return
-            default:
-                listener.cancel()
-                videoListener = nil
-            }
-        }
+        videoListener?.cancel()
+        videoListener = nil
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true
@@ -326,16 +310,8 @@ public final class KoveTCPManager: ObservableObject {
     // MARK: - Port 15457 (Dedicated Heartbeat Server)
     
     private func startHeartbeatServer() {
-        if let listener = heartbeatListener {
-            switch listener.state {
-            case .ready, .setup, .waiting:
-                Logger.shared.info("ℹ️ Dedicated Heartbeat Server already active on PORT \(KoveProtocol.portHeartbeat)")
-                return
-            default:
-                listener.cancel()
-                heartbeatListener = nil
-            }
-        }
+        heartbeatListener?.cancel()
+        heartbeatListener = nil
         do {
             let parameters = NWParameters.tcp
             parameters.allowLocalEndpointReuse = true

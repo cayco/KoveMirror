@@ -75,11 +75,11 @@ public final class H264Encoder: ObservableObject {
     }
     
     public func stopSession() {
-        guard let session = compressionSession else { return }
+        guard isEncoding, let session = compressionSession else { return }
+        isEncoding = false
+        compressionSession = nil
         VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid)
         VTCompressionSessionInvalidate(session)
-        compressionSession = nil
-        isEncoding = false
         Logger.shared.info("🎬 H.264 Encoder session stopped")
     }
     
@@ -109,7 +109,9 @@ public final class H264Encoder: ObservableObject {
     private let outputCallback: VTCompressionOutputCallback = { (outputCallbackRefCon, _, status, flags, sampleBuffer) in
         guard status == noErr, let sampleBuffer = sampleBuffer, let refCon = outputCallbackRefCon else { return }
         let encoder = Unmanaged<H264Encoder>.fromOpaque(refCon).takeUnretainedValue()
-        encoder.processSampleBuffer(sampleBuffer, flags: flags)
+        if encoder.isEncoding {
+            encoder.processSampleBuffer(sampleBuffer, flags: flags)
+        }
     }
     
     private func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, flags: VTEncodeInfoFlags) {

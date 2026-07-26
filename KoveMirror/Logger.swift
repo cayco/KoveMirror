@@ -27,10 +27,14 @@ public struct LogEntry: Identifiable {
     public let level: LogLevel
     public let message: String
     
-    public var formattedTimestamp: String {
+    private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: timestamp)
+        return formatter
+    }()
+    
+    public var formattedTimestamp: String {
+        return Self.dateFormatter.string(from: timestamp)
     }
 }
 
@@ -39,19 +43,17 @@ public final class Logger: ObservableObject {
     
     @Published public private(set) var entries: [LogEntry] = []
     private let maxEntries = 500
-    private let queue = DispatchQueue(label: "com.kove.mirror.logger", qos: .utility)
     
     private init() {}
     
     public func log(_ message: String, level: LogLevel = .info) {
         let entry = LogEntry(timestamp: Date(), level: level, message: message)
         
-        queue.async {
-            DispatchQueue.main.async {
-                self.entries.append(entry)
-                if self.entries.count > self.maxEntries {
-                    self.entries.removeFirst(self.entries.count - self.maxEntries)
-                }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.entries.append(entry)
+            if self.entries.count > self.maxEntries {
+                self.entries.removeFirst(self.entries.count - self.maxEntries)
             }
         }
         
@@ -68,8 +70,9 @@ public final class Logger: ObservableObject {
     public func heartbeat(_ message: String) { log(message, level: .heartbeat) }
     
     public func clear() {
-        DispatchQueue.main.async {
-            self.entries.removeAll()
+        DispatchQueue.main.async { [weak self] in
+            self?.entries.removeAll()
         }
     }
 }
+

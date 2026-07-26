@@ -259,10 +259,12 @@ public final class ScreenCaptureManager: ObservableObject {
             }
         }
         
+        pixelBufferPool = nil
         isCapturing = false
     }
     
     private func setupBufferPool() {
+        pixelBufferPool = nil
         let poolAttributes: [String: Any] = [
             kCVPixelBufferPoolMinimumBufferCountKey as String: 6
         ]

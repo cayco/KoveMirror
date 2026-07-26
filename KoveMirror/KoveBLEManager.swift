@@ -57,6 +57,8 @@ public final class KoveBLEManager: NSObject, ObservableObject {
     
     public func disconnect() {
         stopHeartbeat()
+        sendQueue.removeAll()
+        isProcessingQueue = false
         if let peripheral = connectedPeripheral {
             centralManager.cancelPeripheralConnection(peripheral)
         }
@@ -91,13 +93,14 @@ public final class KoveBLEManager: NSObject, ObservableObject {
             return
         }
         
-        let data = sendQueue.removeFirst()
         guard let peripheral = connectedPeripheral, let char = writeCharacteristic else {
-            Logger.shared.warning("BLE write failed: Peripheral or characteristic not ready")
+            Logger.shared.warning("BLE write deferred: Peripheral or characteristic not ready. Clearing pending queue...")
+            sendQueue.removeAll()
             isProcessingQueue = false
             return
         }
         
+        let data = sendQueue.removeFirst()
         peripheral.writeValue(data, for: char, type: .withoutResponse)
         
         // Pace writes by 120ms to prevent BLE throughput saturation
@@ -135,8 +138,10 @@ public final class KoveBLEManager: NSObject, ObservableObject {
         // 3. Language configuration
         sendJSON(KoveProtocol.makeLanguageSettingJSON())
         
-        // 4. Clock sync
-        sendJSON(KoveProtocol.makeClockSyncJSON())
+        // 4. Clock sync sequence (Mandatory 2-packet protocol sequence: tag -1 then tag 0)
+        let date = Date()
+        sendJSON(KoveProtocol.makeClockSyncJSON(date: date, tag: -1))
+        sendJSON(KoveProtocol.makeClockSyncJSON(date: date, tag: 0))
     }
 }
 
