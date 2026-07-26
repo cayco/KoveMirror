@@ -411,7 +411,7 @@
 				CODE_SIGN_ENTITLEMENTS = KoveMirror/BroadcastExtension/KoveMirrorBroadcast.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L4QQBV468L;
+				DEVELOPMENT_TEAM = VHJK7GS6R7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -436,7 +436,7 @@
 				CODE_SIGN_ENTITLEMENTS = KoveMirror/BroadcastExtension/KoveMirrorBroadcast.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L4QQBV468L;
+				DEVELOPMENT_TEAM = VHJK7GS6R7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KoveMirror/BroadcastExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
